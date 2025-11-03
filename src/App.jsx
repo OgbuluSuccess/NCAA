@@ -39,7 +39,6 @@ function App() {
     setSelectedTeam1(team1);
     setSelectedTeam2(team2);
     setError(null);
-    // Clear previous prediction when teams change
     setPrediction(null);
   }, []);
 
@@ -62,7 +61,7 @@ function App() {
       // Simulate some processing time for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const predictionResult = calculateMatchPrediction(selectedTeam1.teamData, selectedTeam2.teamData);
+      const predictionResult = calculateMatchPrediction(selectedTeam1.team, selectedTeam2.team);
       setPrediction(predictionResult);
     } catch (err) {
       console.error('Prediction calculation error:', err);

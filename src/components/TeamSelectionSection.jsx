@@ -3,7 +3,14 @@ import Select from 'react-select';
 import { Users, Zap, AlertTriangle } from 'lucide-react';
 import { formatTeamsForSelect, validateTeamSelection } from '../utils/teamDataManager';
 
-const TeamSelectionSection = ({ teams, onTeamsSelected, onPredictionRequested }) => {
+const TeamSelectionSection = ({
+  teams,
+  onTeamSelection,
+  onPrediction,
+  onReset,
+  isLoading,
+  hasPrediction,
+}) => {
   const [selectedTeam1, setSelectedTeam1] = useState(null);
   const [selectedTeam2, setSelectedTeam2] = useState(null);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -73,45 +80,36 @@ const TeamSelectionSection = ({ teams, onTeamsSelected, onPredictionRequested })
   const handleTeam1Change = (selectedOption) => {
     setSelectedTeam1(selectedOption);
     setValidationErrors([]);
-    
-    if (selectedOption && selectedTeam2) {
-      onTeamsSelected(selectedOption.team, selectedTeam2.team);
-    } else {
-      onTeamsSelected(null, null);
-    }
+    onTeamSelection(selectedOption, selectedTeam2);
   };
 
   const handleTeam2Change = (selectedOption) => {
     setSelectedTeam2(selectedOption);
     setValidationErrors([]);
-    
-    if (selectedTeam1 && selectedOption) {
-      onTeamsSelected(selectedTeam1.team, selectedOption.team);
-    } else {
-      onTeamsSelected(null, null);
-    }
+    onTeamSelection(selectedTeam1, selectedOption);
   };
 
   const handlePredictClick = () => {
-    const validation = validateTeamSelection(
-      selectedTeam1?.team, 
-      selectedTeam2?.team
-    );
+    // Extract the team data from the selected options
+    const team1Data = selectedTeam1?.team;
+    const team2Data = selectedTeam2?.team;
     
+    const validation = validateTeamSelection(team1Data, team2Data);
+
     if (!validation.isValid) {
       setValidationErrors(validation.errors);
       return;
     }
-    
+
     setValidationErrors([]);
-    onPredictionRequested(selectedTeam1.team, selectedTeam2.team);
+    onPrediction();
   };
 
-  const handleReset = () => {
+  const handleResetClick = () => {
     setSelectedTeam1(null);
     setSelectedTeam2(null);
     setValidationErrors([]);
-    onTeamsSelected(null, null);
+    onReset();
   };
 
   // Filter out selected team from the other dropdown
@@ -239,55 +237,31 @@ const TeamSelectionSection = ({ teams, onTeamsSelected, onPredictionRequested })
         <div className="flex justify-center space-x-4">
           <button
             onClick={handlePredictClick}
-            disabled={!canPredict}
-            className={`
-              flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200
-              ${canPredict 
-                ? 'bg-ncaa-blue hover:bg-blue-600 text-white shadow-lg hover:shadow-xl' 
-                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              }
-            `}
+            disabled={!canPredict || isLoading || hasPrediction}
+            className="btn btn-primary w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Zap className="w-5 h-5" />
-            <span>Predict Match</span>
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Predicting...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <Zap className="w-5 h-5 mr-2" />
+                Predict Match
+              </div>
+            )}
           </button>
-
-          {(selectedTeam1 || selectedTeam2) && (
-            <button
-              onClick={handleReset}
-              className="btn-secondary"
-            >
-              Reset Selection
-            </button>
-          )}
+          <button
+            onClick={handleResetClick}
+            className="btn btn-secondary w-full sm:w-auto"
+          >
+            Reset Selection
+          </button>
         </div>
-
-        {/* Quick Stats Preview */}
-        {selectedTeam1 && selectedTeam2 && (
-          <div className="mt-6 grid grid-cols-2 gap-4 text-center">
-            <div className="bg-ncaa-gray-light rounded-lg p-3">
-              <h4 className="font-semibold text-white text-sm mb-1">
-                {selectedTeam1.team.team}
-              </h4>
-              <div className="text-xs text-gray-400 space-y-1">
-                <div>Rank: #{selectedTeam1.team.rank}</div>
-                <div>Record: {selectedTeam1.team.wins}-{selectedTeam1.team.losses}</div>
-                <div>PPG: {selectedTeam1.team.pointsPerGame}</div>
-              </div>
-            </div>
-            
-            <div className="bg-ncaa-gray-light rounded-lg p-3">
-              <h4 className="font-semibold text-white text-sm mb-1">
-                {selectedTeam2.team.team}
-              </h4>
-              <div className="text-xs text-gray-400 space-y-1">
-                <div>Rank: #{selectedTeam2.team.rank}</div>
-                <div>Record: {selectedTeam2.team.wins}-{selectedTeam2.team.losses}</div>
-                <div>PPG: {selectedTeam2.team.pointsPerGame}</div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
