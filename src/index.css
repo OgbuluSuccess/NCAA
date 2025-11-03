@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom base styles for NCAA Basketball Predictor */
+@layer base {
+  body {
+    @apply bg-ncaa-dark text-white font-sans;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Custom component styles */
+@layer components {
+  .card {
+    @apply bg-ncaa-gray rounded-lg shadow-lg p-6 border border-gray-700;
+  }
+  
+  .btn-primary {
+    @apply bg-ncaa-blue hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-ncaa-gray-light hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .input-field {
+    @apply bg-ncaa-gray-light border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ncaa-blue focus:border-transparent;
+  }
+  
+  .winner-card {
+    @apply bg-ncaa-green border-2 border-green-400;
+  }
+  
+  .loser-card {
+    @apply bg-ncaa-gray border-2 border-gray-600;
+  }
+  
+  .prediction-banner {
+    @apply bg-ncaa-yellow text-black font-bold text-center py-4 px-6 rounded-lg;
+  }
+}
