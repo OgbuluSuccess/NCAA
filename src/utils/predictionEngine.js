@@ -37,6 +37,11 @@ export const calculateMatchPrediction = (team1, team2) => {
     const team1PredictedScore = calculatePredictedScore(team1, team2Probability);
     const team2PredictedScore = calculatePredictedScore(team2, team1Probability);
     
+    // Calculate first half scores (typically 45-48% of total score in college basketball)
+    const firstHalfPercentage = 0.47; // Average percentage of points scored in first half
+    const team1FirstHalfScore = Math.round(team1PredictedScore * firstHalfPercentage);
+    const team2FirstHalfScore = Math.round(team2PredictedScore * firstHalfPercentage);
+    
     // Determine winner
     const winner = team1Probability > team2Probability ? team1 : team2;
     const winnerProbability = Math.max(team1Probability, team2Probability);
@@ -49,12 +54,14 @@ export const calculateMatchPrediction = (team1, team2) => {
         ...team1,
         winProbability: Math.round(team1Probability * 10) / 10,
         predictedScore: team1PredictedScore,
+        firstHalfScore: team1FirstHalfScore,
         isWinner: team1Probability > team2Probability
       },
       team2: {
         ...team2,
         winProbability: Math.round(team2Probability * 10) / 10,
         predictedScore: team2PredictedScore,
+        firstHalfScore: team2FirstHalfScore,
         isWinner: team2Probability > team1Probability
       },
       winner: {

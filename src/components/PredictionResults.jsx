@@ -75,12 +75,12 @@ const PredictionResults = ({ prediction, onReset, isLoading }) => {
             <p className="text-gray-300 text-sm">Predicted Final Score</p>
           </div>
 
-          {/* Point Spread */}
+          {/* First Half Score Prediction */}
           <div className="bg-ncaa-gray-light rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-ncaa-blue mb-1">
-              {Math.abs(Math.round(prediction.predictedScoreDifference))}
+            <div className="text-2xl font-bold text-ncaa-yellow mb-1">
+              {prediction.team1.firstHalfScore} - {prediction.team2.firstHalfScore}
             </div>
-            <p className="text-gray-300 text-sm">Point Margin</p>
+            <p className="text-gray-300 text-sm">Predicted First Half</p>
           </div>
 
           {/* Confidence */}
@@ -89,6 +89,16 @@ const PredictionResults = ({ prediction, onReset, isLoading }) => {
               {prediction.winner.confidence}
             </div>
             <p className="text-gray-300 text-sm">Confidence Level</p>
+          </div>
+        </div>
+
+        {/* Point Spread - Moved to its own row */}
+        <div className="mt-4">
+          <div className="bg-ncaa-gray-light rounded-lg p-4 text-center max-w-xs mx-auto">
+            <div className="text-2xl font-bold text-ncaa-blue mb-1">
+              {Math.abs(Math.round(prediction.predictedScoreDifference))}
+            </div>
+            <p className="text-gray-300 text-sm">Point Margin</p>
           </div>
         </div>
 
