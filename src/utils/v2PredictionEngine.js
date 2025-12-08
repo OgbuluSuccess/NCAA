@@ -359,15 +359,18 @@ const calculateLocationAdjustment = (team1, team2, context) => {
     const neutral1 = team1.neutralRecord ? team1.neutralRecord.wins / (team1.neutralRecord.wins + team1.neutralRecord.losses) : 0.5;
     const neutral2 = team2.neutralRecord ? team2.neutralRecord.wins / (team2.neutralRecord.wins + team2.neutralRecord.losses) : 0.5;
     
+    // Check for winless (0) BEFORE checking < 0.50, since 0 < 0.50
     if (neutral1 >= 0.95) adj1 += 1.5;
     else if (neutral1 >= 0.60) adj1 += 0.5;
-    else if (neutral1 < 0.50) adj1 -= 1.5;
-    else if (neutral1 === 0) adj1 -= 2.5;
+    else if (neutral1 === 0) adj1 -= 2.5; // Winless at neutral site - check first
+    else if (neutral1 < 0.50) adj1 -= 1.5; // Losing record at neutral site
+    // else: 0.50 to 0.60 (no adjustment)
 
     if (neutral2 >= 0.95) adj2 += 1.5;
     else if (neutral2 >= 0.60) adj2 += 0.5;
-    else if (neutral2 < 0.50) adj2 -= 1.5;
-    else if (neutral2 === 0) adj2 -= 2.5;
+    else if (neutral2 === 0) adj2 -= 2.5; // Winless at neutral site - check first
+    else if (neutral2 < 0.50) adj2 -= 1.5; // Losing record at neutral site
+    // else: 0.50 to 0.60 (no adjustment)
   }
 
   return { team1: adj1, team2: adj2 };
@@ -476,4 +479,3 @@ const calculateFirstHalf = (team1Full, team2Full, team1, team2) => {
     total: team1FirstHalf + team2FirstHalf
   };
 };
-

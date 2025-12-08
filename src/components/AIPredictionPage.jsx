@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Image, Upload, Sparkles, Brain, Loader, AlertCircle, CheckCircle, ArrowLeft, Clipboard } from 'lucide-react';
 import { calculateV2Prediction } from '../utils/v2PredictionEngine';
-import { calculateMatchPrediction } from '../utils/predictionEngine';
 
 const AIPredictionPage = ({ onBack }) => {
   const [imageFiles, setImageFiles] = useState([]); // Array of images
@@ -240,43 +239,14 @@ const AIPredictionPage = ({ onBack }) => {
         travelDistance: 0
       };
 
+      // Calculate AI prediction using v2.0 model
       const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
       setAiPrediction(v2Result);
 
-      // Calculate local prediction using existing model
-      // Convert extracted data to format expected by local model
-      const team1ForLocal = {
-        team: extracted.team1?.team || 'Team 1',
-        rank: extracted.team1?.netRank || 150,
-        pointsPerGame: extracted.team1?.ppg || 70,
-        wins: (extracted.team1?.homeRecord?.wins || 0) + (extracted.team1?.awayRecord?.wins || 0),
-        losses: (extracted.team1?.homeRecord?.losses || 0) + (extracted.team1?.awayRecord?.losses || 0),
-        winRate: calculateWinRate(extracted.team1 || {}),
-        conference: '',
-        scoringDefense: extracted.team1?.pointsAllowed || 70,
-        threePointPercentage: extracted.team1?.threePointPct || 0.35,
-        freeThrowPercentage: extracted.team1?.freeThrowPct || 0.70,
-        turnoversPerGame: null,
-        offensiveReboundsPerGame: null
-      };
-
-      const team2ForLocal = {
-        team: extracted.team2?.team || 'Team 2',
-        rank: extracted.team2?.netRank || 150,
-        pointsPerGame: extracted.team2?.ppg || 70,
-        wins: (extracted.team2?.homeRecord?.wins || 0) + (extracted.team2?.awayRecord?.wins || 0),
-        losses: (extracted.team2?.homeRecord?.losses || 0) + (extracted.team2?.awayRecord?.losses || 0),
-        winRate: calculateWinRate(extracted.team2 || {}),
-        conference: '',
-        scoringDefense: extracted.team2?.pointsAllowed || 70,
-        threePointPercentage: extracted.team2?.threePointPct || 0.35,
-        freeThrowPercentage: extracted.team2?.freeThrowPct || 0.70,
-        turnoversPerGame: null,
-        offensiveReboundsPerGame: null
-      };
-
-      const localResult = calculateMatchPrediction(team1ForLocal, team2ForLocal);
-      setLocalPrediction(localResult);
+      // Calculate local prediction using THE SAME v2.0 model with THE SAME data
+      // Both predictions use identical v2.0 calculation - only difference is data source
+      const localV2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
+      setLocalPrediction(localV2Result);
 
     } catch (err) {
       console.error('AI processing error:', err);
@@ -286,12 +256,6 @@ const AIPredictionPage = ({ onBack }) => {
     }
   };
 
-  const calculateWinRate = (team) => {
-    const wins = (team.homeRecord?.wins || 0) + (team.awayRecord?.wins || 0);
-    const losses = (team.homeRecord?.losses || 0) + (team.awayRecord?.losses || 0);
-    const total = wins + losses;
-    return total > 0 ? wins / total : 0.5;
-  };
 
   const handleReset = () => {
     setImageFiles([]);
@@ -344,7 +308,7 @@ const AIPredictionPage = ({ onBack }) => {
             Upload Screenshot • AI Analysis • Dual Model Comparison
           </p>
           <p className="text-gray-400 mt-2">
-            Using ChatGPT Vision API + v2.0 Model + Local Prediction Engine
+            Using ChatGPT Vision API + v2.0 Model (Both Predictions Use Same Model)
           </p>
         </header>
 
@@ -552,11 +516,11 @@ const AIPredictionPage = ({ onBack }) => {
                   <div className="flex items-center space-x-2 mb-4">
                     <Brain className="w-6 h-6 text-ncaa-blue" />
                     <h2 className="text-2xl font-bold text-white">
-                      Local Prediction (Enhanced Model)
+                      Local Prediction (v2.0 Model)
                     </h2>
                   </div>
                   
-                  <PredictionDisplay prediction={localPrediction} modelType="local" />
+                  <PredictionDisplay prediction={localPrediction} modelType="v2" />
                 </div>
               )}
 
@@ -665,6 +629,9 @@ const ComparisonDisplay = ({ aiPrediction, localPrediction }) => {
   const localWinner = localPrediction.team1.isWinner ? localPrediction.team1 : localPrediction.team2;
   
   const sameWinner = aiWinner.name === localWinner.name;
+  const scoreDifference = Math.abs(aiPrediction.total - localPrediction.total);
+  const marginDifference = Math.abs(aiPrediction.margin - localPrediction.margin);
+  const areIdentical = sameWinner && scoreDifference === 0 && marginDifference === 0;
 
   return (
     <div className="space-y-4">
@@ -673,26 +640,40 @@ const ComparisonDisplay = ({ aiPrediction, localPrediction }) => {
           <h4 className="font-semibold text-white mb-2">AI (v2.0) Winner</h4>
           <div className="text-xl font-bold text-ncaa-yellow">{aiWinner.name}</div>
           <div className="text-lg text-gray-300 mt-1">Score: {aiWinner.fullGame}</div>
+          <div className="text-sm text-gray-400 mt-1">Total: {aiPrediction.total} • Margin: {aiPrediction.margin}</div>
         </div>
         <div className="bg-ncaa-gray rounded-lg p-4">
-          <h4 className="font-semibold text-white mb-2">Local Model Winner</h4>
+          <h4 className="font-semibold text-white mb-2">Local (v2.0) Winner</h4>
           <div className="text-xl font-bold text-ncaa-blue">{localWinner.name}</div>
-          <div className="text-lg text-gray-300 mt-1">Score: {localWinner.predictedScore}</div>
+          <div className="text-lg text-gray-300 mt-1">Score: {localWinner.fullGame}</div>
+          <div className="text-sm text-gray-400 mt-1">Total: {localPrediction.total} • Margin: {localPrediction.margin}</div>
         </div>
       </div>
       
-      <div className={`p-3 rounded-lg ${sameWinner ? 'bg-green-900/30 border border-green-600' : 'bg-yellow-900/30 border border-yellow-600'}`}>
+      <div className={`p-3 rounded-lg ${areIdentical ? 'bg-green-900/30 border border-green-600' : sameWinner ? 'bg-blue-900/30 border border-blue-600' : 'bg-yellow-900/30 border border-yellow-600'}`}>
         <div className="flex items-center space-x-2">
-          {sameWinner ? (
-            <CheckCircle className="w-5 h-5 text-green-400" />
+          {areIdentical ? (
+            <>
+              <CheckCircle className="w-5 h-5 text-green-400" />
+              <span className="text-green-300 font-semibold">
+                Both predictions are identical! Same model, same data, same results.
+              </span>
+            </>
+          ) : sameWinner ? (
+            <>
+              <CheckCircle className="w-5 h-5 text-blue-400" />
+              <span className="text-blue-300">
+                Both models agree on the winner! Score difference: {scoreDifference} points
+              </span>
+            </>
           ) : (
-            <AlertCircle className="w-5 h-5 text-yellow-400" />
+            <>
+              <AlertCircle className="w-5 h-5 text-yellow-400" />
+              <span className="text-yellow-300">
+                Models differ on the predicted winner (should not happen with same model/data)
+              </span>
+            </>
           )}
-          <span className={sameWinner ? 'text-green-300' : 'text-yellow-300'}>
-            {sameWinner 
-              ? 'Both models agree on the winner!' 
-              : 'Models differ on the predicted winner'}
-          </span>
         </div>
       </div>
     </div>
