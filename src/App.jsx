@@ -1,12 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import { Trophy, BarChart3 } from 'lucide-react';
+import { Trophy, BarChart3, Sparkles } from 'lucide-react';
 import FileUploadSection from './components/FileUploadSection';
 import TeamSelectionSection from './components/TeamSelectionSection';
 import PredictionResults from './components/PredictionResults';
+import AIPredictionPage from './components/AIPredictionPage';
 import { calculateMatchPrediction } from './utils/predictionEngine';
 import './App.css';
 
 function App() {
+  const [currentPage, setCurrentPage] = useState('main'); // 'main' or 'ai'
   // Application state
   const [teams, setTeams] = useState([]);
   const [selectedTeam1, setSelectedTeam1] = useState(null);
@@ -90,6 +92,11 @@ function App() {
     setIsLoading(false);
   }, []);
 
+  // Show AI page if selected
+  if (currentPage === 'ai') {
+    return <AIPredictionPage onBack={() => setCurrentPage('main')} />;
+  }
+
   return (
     <div className="min-h-screen bg-ncaa-dark">
       <div className="container mx-auto px-4 py-8">
@@ -108,6 +115,17 @@ function App() {
           <p className="text-gray-400 mt-2">
             Advanced statistical analysis for NCAA Division I men's basketball matchups
           </p>
+          
+          {/* Navigation to AI Page */}
+          <div className="mt-6">
+            <button
+              onClick={() => setCurrentPage('ai')}
+              className="btn-primary flex items-center space-x-2 mx-auto"
+            >
+              <Sparkles className="w-5 h-5" />
+              <span>Try AI-Powered Prediction (Screenshot Upload)</span>
+            </button>
+          </div>
         </header>
 
         {/* Global Error Display */}

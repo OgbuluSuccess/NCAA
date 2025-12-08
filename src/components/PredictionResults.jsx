@@ -145,6 +145,105 @@ const PredictionResults = ({ prediction, onReset, isLoading }) => {
             </div>
           </div>
         </div>
+
+        {/* Advanced Metrics Snapshot */}
+        <div className="mt-6">
+          <h4 className="text-white font-semibold mb-3">Advanced Metrics Snapshot</h4>
+          <div className="bg-ncaa-gray-light rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            {prediction && (
+              <>
+                {prediction.team1.effectiveFgPct != null && prediction.team2.effectiveFgPct != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">eFG%:</span>
+                    <span className="text-white font-medium">
+                      {Math.round((prediction.team1.effectiveFgPct)*100)}% vs {Math.round((prediction.team2.effectiveFgPct)*100)}%
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.turnoverMargin != null && prediction.team2.turnoverMargin != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">TO Margin:</span>
+                    <span className="text-white font-medium">
+                      {prediction.team1.turnoverMargin} vs {prediction.team2.turnoverMargin}
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.turnoversPerGame != null && prediction.team2.turnoversPerGame != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Turnovers/Game:</span>
+                    <span className="text-white font-medium">
+                      {prediction.team1.turnoversPerGame} vs {prediction.team2.turnoversPerGame}
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.assistTurnoverRatio != null && prediction.team2.assistTurnoverRatio != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">AST/TO:</span>
+                    <span className="text-white font-medium">
+                      {prediction.team1.assistTurnoverRatio} vs {prediction.team2.assistTurnoverRatio}
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.offensiveReboundsPerGame != null && prediction.team2.offensiveReboundsPerGame != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Off Reb/G:</span>
+                    <span className="text-white font-medium">
+                      {prediction.team1.offensiveReboundsPerGame} vs {prediction.team2.offensiveReboundsPerGame}
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.freeThrowPercentage != null && prediction.team2.freeThrowPercentage != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">FT%:</span>
+                    <span className="text-white font-medium">
+                      {Math.round((prediction.team1.freeThrowPercentage <= 1 ? prediction.team1.freeThrowPercentage*100 : prediction.team1.freeThrowPercentage))}% vs {Math.round((prediction.team2.freeThrowPercentage <= 1 ? prediction.team2.freeThrowPercentage*100 : prediction.team2.freeThrowPercentage))}%
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.threePointPercentage != null && prediction.team2.threePointPercentage != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">3P%:</span>
+                    <span className="text-white font-medium">
+                      {Math.round((prediction.team1.threePointPercentage <= 1 ? prediction.team1.threePointPercentage*100 : prediction.team1.threePointPercentage))}% vs {Math.round((prediction.team2.threePointPercentage <= 1 ? prediction.team2.threePointPercentage*100 : prediction.team2.threePointPercentage))}%
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.threePointPercentageDefense != null && prediction.team2.threePointPercentageDefense != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Opp 3P%:</span>
+                    <span className="text-white font-medium">
+                      {Math.round((prediction.team1.threePointPercentageDefense <= 1 ? prediction.team1.threePointPercentageDefense*100 : prediction.team1.threePointPercentageDefense))}% vs {Math.round((prediction.team2.threePointPercentageDefense <= 1 ? prediction.team2.threePointPercentageDefense*100 : prediction.team2.threePointPercentageDefense))}%
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.scoringDefense != null && prediction.team2.scoringDefense != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Scoring Defense (PPG allowed):</span>
+                    <span className="text-white font-medium">
+                      {prediction.team1.scoringDefense} vs {prediction.team2.scoringDefense}
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.benchPointsPerGame != null && prediction.team2.benchPointsPerGame != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Bench Pts/G:</span>
+                    <span className="text-white font-medium">
+                      {prediction.team1.benchPointsPerGame} vs {prediction.team2.benchPointsPerGame}
+                    </span>
+                  </div>
+                )}
+                {prediction.team1.threePointAttemptsPerGame != null && prediction.team2.threePointAttemptsPerGame != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">3PA/G:</span>
+                    <span className="text-white font-medium">
+                      {prediction.team1.threePointAttemptsPerGame} vs {prediction.team2.threePointAttemptsPerGame}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
