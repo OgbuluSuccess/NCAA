@@ -546,11 +546,11 @@ const calculateExtremeMismatch = (team1, team2, team1Score, team2Score) => {
   }
 
   // 11C: Post-Losing Streak Statement Game
-  // If favored team on 3+ loss streak AND vs Bottom 50 opponent
+  // If favored team on 3+ loss streak AND vs Bottom 50 opponent (NET >= 314, exact bottom 50 of 363 teams)
   const team1LossStreak = team1.lossStreak || 0;
   const team2LossStreak = team2.lossStreak || 0;
   
-  if (team1LossStreak >= 3 && net2 >= 316) {
+  if (team1LossStreak >= 3 && net2 >= 314) {
     // Team 1 on losing streak, playing bottom 50 team
     // Check if Team 1 is favored (lower NET rank = better)
     if (net1 < net2) {
@@ -558,7 +558,7 @@ const calculateExtremeMismatch = (team1, team2, team1Score, team2Score) => {
     }
   }
   
-  if (team2LossStreak >= 3 && net1 >= 316) {
+  if (team2LossStreak >= 3 && net1 >= 314) {
     // Team 2 on losing streak, playing bottom 50 team
     // Check if Team 2 is favored (lower NET rank = better)
     if (net2 < net1) {
