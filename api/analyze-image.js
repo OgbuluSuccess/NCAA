@@ -23,45 +23,72 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'OpenAI API key not configured on server' });
     }
 
-    const prompt = `You are analyzing a screenshot of NCAA basketball team statistics. Extract the following data for TWO teams (Team 1 and Team 2) and return ONLY a valid JSON object with this exact structure. Use the v2.0 prediction model specification I provided.
+    const prompt = `You are analyzing a screenshot of NCAA basketball team statistics. The image shows statistical tables for TWO teams. Extract data for BOTH teams and return ONLY valid JSON.
 
-Return JSON in this format:
+CRITICAL INSTRUCTIONS:
+1. Look for TWO separate team tables/sections in the image
+2. Each table has columns: Statistic, National Rank, Conference Rank, Value, National Leader, Conference Leader
+3. Extract the "Value" column for each statistic (NOT the rank)
+4. Extract the "National Rank" for ranking-based fields
+
+DATA EXTRACTION GUIDE:
+- "Scoring Offense" row → Extract the "Value" column → This is "ppg" (points per game)
+- "Scoring Defense" row → Extract the "Value" column → This is "pointsAllowed" 
+- "Scoring Defense" row → Extract the "National Rank" column → This is "defenseRank"
+- "Scoring Offense" row → Extract the "National Rank" column → This is "ppgRank"
+- "Field Goal Percentage" row → Extract "Value" → Convert to decimal (divide by 100) → "fieldGoalPct"
+- "Three Point Percentage" row → Extract "Value" → Convert to decimal → "threePointPct"
+- "Free Throw Percentage" row → Extract "Value" → Convert to decimal → "freeThrowPct"
+- "Winning Percentage" row → Extract "Value" → Convert to decimal → Use to calculate win/loss record
+- Look for team name in headers or table titles
+- Look for NET Ranking or KenPom ranking if visible
+- Look for records (W-L format) if visible in the image
+- Look for recent game results or streaks if visible
+
+IMPORTANT:
+- If you see percentage values like "76.7", convert to decimal: 0.767
+- If you see "41.3" for Field Goal %, that's already a percentage, convert to 0.413
+- Extract ACTUAL VALUES, not ranks (except for defenseRank and ppgRank which ARE ranks)
+- If the table shows multiple teams, identify which two teams are being compared
+- If only one team table is visible, you may need to look for opponent data elsewhere in the image
+
+Return JSON in this exact format:
 {
   "team1": {
-    "team": "Team Name",
-    "ppg": 82.5,
-    "pointsAllowed": 70.2,
-    "defenseRank": 60,
-    "fieldGoalPct": 0.47,
-    "threePointPct": 0.38,
-    "freeThrowPct": 0.75,
-    "ppgRank": 120,
-    "netRank": 45,
-    "homeRecord": {"wins": 5, "losses": 1},
-    "awayRecord": {"wins": 2, "losses": 3},
-    "neutralRecord": {"wins": 1, "losses": 0},
-    "winStreak": 3,
+    "team": "Exact Team Name from Image",
+    "ppg": 84.3,
+    "pointsAllowed": 80.3,
+    "defenseRank": 316,
+    "fieldGoalPct": 0.48,
+    "threePointPct": 0.383,
+    "freeThrowPct": 0.689,
+    "ppgRank": 78,
+    "netRank": 150,
+    "homeRecord": {"wins": 0, "losses": 0},
+    "awayRecord": {"wins": 0, "losses": 0},
+    "neutralRecord": {"wins": 0, "losses": 0},
+    "winStreak": 0,
     "lossStreak": 0,
-    "last5PPG": 85.0,
-    "firstHalfPPG": 39.5
+    "last5PPG": 84.3,
+    "firstHalfPPG": 40.5
   },
   "team2": {
-    "team": "Team Name",
-    "ppg": 75.0,
-    "pointsAllowed": 74.0,
-    "defenseRank": 180,
-    "fieldGoalPct": 0.44,
-    "threePointPct": 0.34,
-    "freeThrowPct": 0.70,
-    "ppgRank": 220,
-    "netRank": 120,
-    "homeRecord": {"wins": 4, "losses": 1},
-    "awayRecord": {"wins": 2, "losses": 3},
-    "neutralRecord": {"wins": 0, "losses": 1},
+    "team": "Exact Team Name from Image",
+    "ppg": 69.1,
+    "pointsAllowed": 88.4,
+    "defenseRank": 355,
+    "fieldGoalPct": 0.413,
+    "threePointPct": 0.299,
+    "freeThrowPct": 0.767,
+    "ppgRank": 322,
+    "netRank": 350,
+    "homeRecord": {"wins": 0, "losses": 0},
+    "awayRecord": {"wins": 0, "losses": 0},
+    "neutralRecord": {"wins": 0, "losses": 0},
     "winStreak": 0,
-    "lossStreak": 2,
-    "last5PPG": 72.0,
-    "firstHalfPPG": 36.0
+    "lossStreak": 0,
+    "last5PPG": 69.1,
+    "firstHalfPPG": 33.2
   },
   "gameContext": {
     "isConferenceGame": false,
@@ -71,19 +98,19 @@ Return JSON in this format:
   }
 }
 
-If any data is missing, use reasonable defaults:
-- defenseRank: 150 (average)
-- fieldGoalPct: 0.45
-- threePointPct: 0.35
-- freeThrowPct: 0.70
-- ppgRank: 200
-- netRank: 150
-- homeRecord/awayRecord/neutralRecord: {"wins": 0, "losses": 0} if missing
-- winStreak/lossStreak: 0 if missing
-- last5PPG: use ppg if missing
-- firstHalfPPG: ppg * 0.48 if missing
+DEFAULTS (only use if data truly not visible):
+- defenseRank: Use "Scoring Defense" National Rank if available, else 150
+- fieldGoalPct: Extract from "Field Goal Percentage" Value, convert % to decimal
+- threePointPct: Extract from "Three Point Percentage" Value, convert % to decimal  
+- freeThrowPct: Extract from "Free Throw Percentage" Value, convert % to decimal
+- ppgRank: Use "Scoring Offense" National Rank
+- netRank: Look for NET ranking, else estimate from other ranks, else 150
+- Records: Look for W-L records in image, else {"wins": 0, "losses": 0}
+- winStreak/lossStreak: Look for recent results, else 0
+- last5PPG: Use ppg if not visible
+- firstHalfPPG: ppg * 0.48 if not visible
 
-Return ONLY the JSON, no other text.`;
+Return ONLY the JSON object, no markdown, no explanations, no other text.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

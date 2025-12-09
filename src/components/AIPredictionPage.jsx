@@ -3,9 +3,13 @@ import { Image, Upload, Sparkles, Brain, Loader, AlertCircle, CheckCircle, Arrow
 import { calculateV2Prediction } from '../utils/v2PredictionEngine';
 
 const AIPredictionPage = ({ onBack }) => {
+  const [inputMode, setInputMode] = useState('image'); // 'image' or 'manual'
   const [imageFiles, setImageFiles] = useState([]); // Array of images
   const [imagePreviews, setImagePreviews] = useState([]); // Array of preview URLs
   const [selectedImageIndex, setSelectedImageIndex] = useState(0); // Currently selected image
+  const [manualTeam1Data, setManualTeam1Data] = useState(''); // Manual JSON input for team 1
+  const [manualTeam2Data, setManualTeam2Data] = useState(''); // Manual JSON input for team 2
+  const [manualGameContext, setManualGameContext] = useState(''); // Manual JSON input for game context
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [aiPrediction, setAiPrediction] = useState(null);
@@ -192,6 +196,38 @@ const AIPredictionPage = ({ onBack }) => {
       const extracted = result.data;
       setExtractedData(extracted);
 
+      // Log extracted data for debugging
+      console.log('Extracted Data from AI:', JSON.stringify(extracted, null, 2));
+
+      // Validate extracted data
+      const validationErrors = [];
+      
+      // Check critical fields
+      if (!extracted.team1?.team || !extracted.team2?.team) {
+        validationErrors.push('Team names are missing');
+      }
+      
+      if (!extracted.team1?.ppg || extracted.team1.ppg < 40 || extracted.team1.ppg > 120) {
+        validationErrors.push(`Team 1 PPG seems invalid: ${extracted.team1?.ppg} (expected 40-120)`);
+      }
+      
+      if (!extracted.team2?.ppg || extracted.team2.ppg < 40 || extracted.team2.ppg > 120) {
+        validationErrors.push(`Team 2 PPG seems invalid: ${extracted.team2?.ppg} (expected 40-120)`);
+      }
+      
+      if (!extracted.team1?.defenseRank || extracted.team1.defenseRank < 1 || extracted.team1.defenseRank > 363) {
+        validationErrors.push(`Team 1 Defense Rank seems invalid: ${extracted.team1?.defenseRank} (expected 1-363)`);
+      }
+      
+      if (!extracted.team2?.defenseRank || extracted.team2.defenseRank < 1 || extracted.team2.defenseRank > 363) {
+        validationErrors.push(`Team 2 Defense Rank seems invalid: ${extracted.team2?.defenseRank} (expected 1-363)`);
+      }
+
+      if (validationErrors.length > 0) {
+        console.warn('Data validation warnings:', validationErrors);
+        // Show warnings but continue with prediction
+      }
+
       // Calculate AI prediction using v2.0 model
       // Ensure all required fields are present with defaults
       const team1ForV2 = {
@@ -261,12 +297,315 @@ const AIPredictionPage = ({ onBack }) => {
     setImageFiles([]);
     setImagePreviews([]);
     setSelectedImageIndex(0);
+    setManualTeam1Data('');
+    setManualTeam2Data('');
+    setManualGameContext('');
     setAiPrediction(null);
     setLocalPrediction(null);
     setExtractedData(null);
     setError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  // Parse text format stats (e.g., "Team1, Team Stats - Through games 12/07/2025\nStat\tRank\tValue\n...")
+  const parseTextStats = (text) => {
+    const lines = text.trim().split(/\r?\n/).map(line => line.trim()).filter(line => line);
+    if (lines.length < 3) {
+      throw new Error('Text format must have at least a header line, column headers, and one data row');
+    }
+
+    // Extract team name from first line (format: "TeamName, Team Stats - Through games ...")
+    const firstLine = lines[0];
+    const teamNameMatch = firstLine.match(/^([^,]+),/);
+    const teamName = teamNameMatch ? teamNameMatch[1].trim() : 'Unknown Team';
+
+    // Find header row (should contain "Stat", "Rank", "Value")
+    let headerRowIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase();
+      if (line.includes('stat') && (line.includes('rank') || line.includes('value'))) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      throw new Error('Could not find header row with "Stat", "Rank", "Value" columns');
+    }
+
+    // Check if it's tab-separated (most common format)
+    const headerLine = lines[headerRowIndex];
+    const isTabSeparated = headerLine.includes('\t');
+    
+    let statIdx, rankIdx, valueIdx;
+    
+    if (isTabSeparated) {
+      // Tab-separated format
+      const headerTabs = headerLine.split('\t').map(h => h.trim().toLowerCase());
+      statIdx = headerTabs.findIndex(h => h.includes('stat'));
+      rankIdx = headerTabs.findIndex(h => h.includes('rank'));
+      valueIdx = headerTabs.findIndex(h => h.includes('value'));
+      
+      if (statIdx === -1 || rankIdx === -1 || valueIdx === -1) {
+        throw new Error('Could not identify Stat, Rank, and Value columns in tab-separated format');
+      }
+    } else {
+      // Space-separated format
+      const headerParts = headerLine.toLowerCase().split(/\s+/);
+      statIdx = headerParts.findIndex(p => p.includes('stat'));
+      rankIdx = headerParts.findIndex(p => p.includes('rank'));
+      valueIdx = headerParts.findIndex(p => p.includes('value'));
+      
+      if (statIdx === -1 || rankIdx === -1 || valueIdx === -1) {
+        throw new Error('Could not identify Stat, Rank, and Value columns');
+      }
+    }
+    
+    // Parse data rows
+    const stats = {};
+    for (let i = headerRowIndex + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line || line.trim() === '') continue;
+      
+      let parts;
+      if (isTabSeparated) {
+        parts = line.split('\t').map(p => p.trim());
+      } else {
+        parts = line.split(/\s+/);
+      }
+      
+      if (parts.length < Math.max(statIdx, rankIdx, valueIdx) + 1) continue;
+      
+      const stat = parts[statIdx]?.trim();
+      const rank = parts[rankIdx]?.trim();
+      const value = parts[valueIdx]?.trim();
+      
+      if (stat && value) {
+        // Clean rank (remove "T-" prefix, commas, etc.)
+        const cleanRank = rank ? parseInt(rank.replace(/[^0-9]/g, '')) || null : null;
+        const cleanValue = parseFloat(value.replace(/[^0-9.]/g, '')) || null;
+        
+        if (cleanValue !== null) {
+          stats[stat.toLowerCase()] = { 
+            rank: cleanRank, 
+            value: cleanValue 
+          };
+        }
+      }
+    }
+
+    return { teamName, stats };
+  };
+
+  // Convert parsed stats to v2.0 format
+  const convertStatsToV2Format = (parsedData) => {
+    const { teamName, stats } = parsedData;
+    
+    // Helper to get stat value (fuzzy matching)
+    const getValue = (keys) => {
+      const keyArray = Array.isArray(keys) ? keys : [keys];
+      for (const key of keyArray) {
+        for (const [statKey, data] of Object.entries(stats)) {
+          const normalizedKey = key.toLowerCase().replace(/\s+/g, '');
+          const normalizedStat = statKey.toLowerCase().replace(/\s+/g, '');
+          if (normalizedStat.includes(normalizedKey) || normalizedKey.includes(normalizedStat)) {
+            return data.value;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Helper to get stat rank (fuzzy matching)
+    const getRank = (keys) => {
+      const keyArray = Array.isArray(keys) ? keys : [keys];
+      for (const key of keyArray) {
+        for (const [statKey, data] of Object.entries(stats)) {
+          const normalizedKey = key.toLowerCase().replace(/\s+/g, '');
+          const normalizedStat = statKey.toLowerCase().replace(/\s+/g, '');
+          if (normalizedStat.includes(normalizedKey) || normalizedKey.includes(normalizedStat)) {
+            return data.rank;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Extract values with multiple possible key variations
+    const ppg = getValue(['scoring offense', 'scoringoffense', 'points per game', 'ppg']);
+    const pointsAllowed = getValue(['scoring defense', 'scoringdefense', 'points allowed', 'pointsallowed']);
+    const defenseRank = getRank(['scoring defense', 'scoringdefense', 'defense rank']);
+    const ppgRank = getRank(['scoring offense', 'scoringoffense', 'offense rank', 'ppg rank']);
+    
+    // Percentages (convert to decimal if > 1, otherwise assume already decimal)
+    const fgPctRaw = getValue(['field goal percentage', 'fieldgoal', 'fg%', 'fg pct']);
+    const fgPct = fgPctRaw ? (fgPctRaw > 1 ? fgPctRaw / 100 : fgPctRaw) : null;
+    
+    const threePctRaw = getValue(['three point percentage', 'threepoint', '3pt%', '3pt pct', 'three point pct']);
+    const threePct = threePctRaw ? (threePctRaw > 1 ? threePctRaw / 100 : threePctRaw) : null;
+    
+    const ftPctRaw = getValue(['free throw percentage', 'freethrow', 'ft%', 'ft pct', 'free throw pct']);
+    const ftPct = ftPctRaw ? (ftPctRaw > 1 ? ftPctRaw / 100 : ftPctRaw) : null;
+    
+    // Winning percentage
+    const winPctRaw = getValue(['winning percentage', 'winning', 'win%', 'win pct']);
+    const winPct = winPctRaw ? (winPctRaw > 1 ? winPctRaw / 100 : winPctRaw) : null;
+    
+    // NET ranking
+    const netRank = getRank(['net', 'net ranking', 'net rank']);
+    
+    // Default records (we don't have home/away/neutral breakdown from this format)
+    let homeRecord = { wins: 0, losses: 0 };
+    let awayRecord = { wins: 0, losses: 0 };
+    let neutralRecord = { wins: 0, losses: 0 };
+    
+    return {
+      team: teamName,
+      ppg: ppg || 70,
+      pointsAllowed: pointsAllowed || 70,
+      defenseRank: defenseRank || 150,
+      fieldGoalPct: fgPct || 0.45,
+      threePointPct: threePct || 0.35,
+      freeThrowPct: ftPct || 0.70,
+      ppgRank: ppgRank || 200,
+      netRank: netRank || ppgRank || 150,
+      homeRecord,
+      awayRecord,
+      neutralRecord,
+      winStreak: 0,
+      lossStreak: 0,
+      last5PPG: ppg || 70,
+      firstHalfPPG: ppg ? (ppg * 0.48) : 33.6
+    };
+  };
+
+  const processManualData = async () => {
+    if (!manualTeam1Data.trim() || !manualTeam2Data.trim()) {
+      setError('Please provide data for both Team 1 and Team 2');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError('');
+    setAiPrediction(null);
+    setLocalPrediction(null);
+
+    try {
+      // Try to parse as JSON first, then as text format
+      let team1Data, team2Data, gameContextData;
+
+      // Parse Team 1
+      try {
+        team1Data = JSON.parse(manualTeam1Data);
+      } catch (e) {
+        // Not JSON, try text format
+        try {
+          const parsed = parseTextStats(manualTeam1Data);
+          team1Data = convertStatsToV2Format(parsed);
+        } catch (textError) {
+          throw new Error(`Team 1 data is not valid JSON or text format: ${e.message}`);
+        }
+      }
+
+      // Parse Team 2
+      try {
+        team2Data = JSON.parse(manualTeam2Data);
+      } catch (e) {
+        // Not JSON, try text format
+        try {
+          const parsed = parseTextStats(manualTeam2Data);
+          team2Data = convertStatsToV2Format(parsed);
+        } catch (textError) {
+          throw new Error(`Team 2 data is not valid JSON or text format: ${e.message}`);
+        }
+      }
+
+      if (manualGameContext.trim()) {
+        try {
+          gameContextData = JSON.parse(manualGameContext);
+        } catch (e) {
+          throw new Error(`Game context is not valid JSON: ${e.message}`);
+        }
+      } else {
+        gameContextData = {
+          isConferenceGame: false,
+          team1Location: 'home',
+          daysRest: 2,
+          travelDistance: 0
+        };
+      }
+
+      // Combine into extracted format
+      const extracted = {
+        team1: team1Data,
+        team2: team2Data,
+        gameContext: gameContextData
+      };
+
+      setExtractedData(extracted);
+      console.log('Manual Data Input:', JSON.stringify(extracted, null, 2));
+
+      // Validate and prepare data for v2.0 model (same as AI extraction)
+      const team1ForV2 = {
+        team: extracted.team1?.team || 'Team 1',
+        ppg: extracted.team1?.ppg || 70,
+        pointsAllowed: extracted.team1?.pointsAllowed || 70,
+        defenseRank: extracted.team1?.defenseRank || 150,
+        fieldGoalPct: extracted.team1?.fieldGoalPct || 0.45,
+        threePointPct: extracted.team1?.threePointPct || 0.35,
+        freeThrowPct: extracted.team1?.freeThrowPct || 0.70,
+        ppgRank: extracted.team1?.ppgRank || 200,
+        netRank: extracted.team1?.netRank || 150,
+        homeRecord: extracted.team1?.homeRecord || { wins: 0, losses: 0 },
+        awayRecord: extracted.team1?.awayRecord || { wins: 0, losses: 0 },
+        neutralRecord: extracted.team1?.neutralRecord || { wins: 0, losses: 0 },
+        winStreak: extracted.team1?.winStreak || 0,
+        lossStreak: extracted.team1?.lossStreak || 0,
+        last5PPG: extracted.team1?.last5PPG || extracted.team1?.ppg || 70,
+        firstHalfPPG: extracted.team1?.firstHalfPPG || ((extracted.team1?.ppg || 70) * 0.48)
+      };
+
+      const team2ForV2 = {
+        team: extracted.team2?.team || 'Team 2',
+        ppg: extracted.team2?.ppg || 70,
+        pointsAllowed: extracted.team2?.pointsAllowed || 70,
+        defenseRank: extracted.team2?.defenseRank || 150,
+        fieldGoalPct: extracted.team2?.fieldGoalPct || 0.45,
+        threePointPct: extracted.team2?.threePointPct || 0.35,
+        freeThrowPct: extracted.team2?.freeThrowPct || 0.70,
+        ppgRank: extracted.team2?.ppgRank || 200,
+        netRank: extracted.team2?.netRank || 150,
+        homeRecord: extracted.team2?.homeRecord || { wins: 0, losses: 0 },
+        awayRecord: extracted.team2?.awayRecord || { wins: 0, losses: 0 },
+        neutralRecord: extracted.team2?.neutralRecord || { wins: 0, losses: 0 },
+        winStreak: extracted.team2?.winStreak || 0,
+        lossStreak: extracted.team2?.lossStreak || 0,
+        last5PPG: extracted.team2?.last5PPG || extracted.team2?.ppg || 70,
+        firstHalfPPG: extracted.team2?.firstHalfPPG || ((extracted.team2?.ppg || 70) * 0.48)
+      };
+
+      const gameContext = extracted.gameContext || {
+        isConferenceGame: false,
+        team1Location: 'home',
+        daysRest: 2,
+        travelDistance: 0
+      };
+
+      // Calculate predictions using v2.0 model
+      const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
+      setAiPrediction(v2Result);
+
+      // Local prediction uses same model and data
+      const localV2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
+      setLocalPrediction(localV2Result);
+
+    } catch (err) {
+      console.error('Manual data processing error:', err);
+      setError(err.message || 'Failed to process manual data. Please check your JSON format.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -348,11 +687,40 @@ const AIPredictionPage = ({ onBack }) => {
         )}
 
         <div className="max-w-6xl mx-auto space-y-8">
+          {/* Input Mode Toggle */}
+          <div className="card bg-ncaa-gray-light">
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={() => setInputMode('image')}
+                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                  inputMode === 'image'
+                    ? 'bg-ncaa-blue text-white'
+                    : 'bg-ncaa-gray text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <Image className="w-4 h-4 inline mr-2" />
+                Image Upload
+              </button>
+              <button
+                onClick={() => setInputMode('manual')}
+                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                  inputMode === 'manual'
+                    ? 'bg-ncaa-blue text-white'
+                    : 'bg-ncaa-gray text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <Clipboard className="w-4 h-4 inline mr-2" />
+                Manual Input
+              </button>
+            </div>
+          </div>
+
           {/* Image Upload Section */}
-          <div className="card" ref={containerRef}>
-            <h2 className="text-xl font-bold text-white mb-4">
-              Upload Screenshot
-            </h2>
+          {inputMode === 'image' && (
+            <div className="card" ref={containerRef}>
+              <h2 className="text-xl font-bold text-white mb-4">
+                Upload Screenshot
+              </h2>
             
             <div className="space-y-4">
               {/* Upload Area */}
@@ -491,7 +859,103 @@ const AIPredictionPage = ({ onBack }) => {
                 )}
               </div>
             </div>
-          </div>
+            </div>
+          )}
+
+          {/* Manual Input Section */}
+          {inputMode === 'manual' && (
+            <div className="card">
+              <h2 className="text-xl font-bold text-white mb-4">
+                Manual Data Input
+              </h2>
+              
+              <div className="space-y-4">
+                <p className="text-gray-300 text-sm mb-4">
+                  Paste data for each team. You can use either:
+                  <br />• <strong>JSON format</strong> (same as AI extraction output)
+                  <br />• <strong>Text format</strong> (copy-paste from stats table with Stat, Rank, Value columns)
+                </p>
+
+                {/* Team 1 Input */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-300">
+                    Team 1 Data (JSON or Text Format)
+                  </label>
+                  <textarea
+                    value={manualTeam1Data}
+                    onChange={(e) => setManualTeam1Data(e.target.value)}
+                    placeholder={`Paste JSON or text format:\n\nJSON:\n{\n  "team": "Team Name",\n  "ppg": 84.3,\n  ...\n}\n\nOR Text Format:\nTeam1, Team Stats - Through games 12/07/2025\nStat\tRank\tValue\nScoring Offense\t78\t84.3\nScoring Defense\t316\t80.3\n...`}
+                    className="w-full h-64 bg-ncaa-gray-light border border-gray-600 text-white rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ncaa-blue focus:border-transparent"
+                  />
+                </div>
+
+                {/* Team 2 Input */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-300">
+                    Team 2 Data (JSON or Text Format)
+                  </label>
+                  <textarea
+                    value={manualTeam2Data}
+                    onChange={(e) => setManualTeam2Data(e.target.value)}
+                    placeholder={`Paste JSON or text format:\n\nJSON:\n{\n  "team": "Team Name",\n  "ppg": 69.1,\n  ...\n}\n\nOR Text Format:\nTeam2, Team Stats - Through games 12/07/2025\nStat\tRank\tValue\nScoring Offense\t322\t69.1\nScoring Defense\t355\t88.4\n...`}
+                    className="w-full h-64 bg-ncaa-gray-light border border-gray-600 text-white rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ncaa-blue focus:border-transparent"
+                  />
+                </div>
+
+                {/* Game Context Input (Optional) */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-300">
+                    Game Context (JSON - Optional)
+                  </label>
+                  <textarea
+                    value={manualGameContext}
+                    onChange={(e) => setManualGameContext(e.target.value)}
+                    placeholder={`{\n  "isConferenceGame": false,\n  "team1Location": "home",\n  "daysRest": 2,\n  "travelDistance": 0\n}`}
+                    className="w-full h-32 bg-ncaa-gray-light border border-gray-600 text-white rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ncaa-blue focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-400">
+                    Optional. If left empty, defaults will be used.
+                  </p>
+                </div>
+
+                {/* Action Button */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={processManualData}
+                    disabled={!manualTeam1Data.trim() || !manualTeam2Data.trim() || isProcessing}
+                    className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Calculate Prediction</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Extracted Data Debug View */}
+          {extractedData && (
+            <div className="card bg-ncaa-gray-light border border-ncaa-blue">
+              <h3 className="text-lg font-bold text-white mb-3">Extracted Data (Debug View)</h3>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-ncaa-blue hover:text-ncaa-yellow mb-2 font-semibold">
+                  Click to view raw extracted data from AI
+                </summary>
+                <pre className="bg-black/50 p-4 rounded overflow-auto text-xs text-gray-300 max-h-96">
+                  {JSON.stringify(extractedData, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
 
           {/* Predictions Display */}
           {(aiPrediction || localPrediction) && (

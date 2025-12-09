@@ -1,11 +1,12 @@
 /**
- * NCAA Basketball Prediction Model v2.0
- * Complete implementation of the v2.0 specification
+ * NCAA Basketball Prediction Model v2.1
+ * Complete implementation of the v2.1 specification
+ * Includes v2.0 base model + STEP 11: Extreme Mismatch Adjustments
  * DO NOT MODIFY - Use exactly as specified
  */
 
 /**
- * Calculate prediction using v2.0 model
+ * Calculate prediction using v2.1 model
  * @param {Object} team1 - First team data
  * @param {Object} team2 - Second team data
  * @param {Object} gameContext - Game context (home/away, conference, etc.)
@@ -74,27 +75,61 @@ export const calculateV2Prediction = (team1, team2, gameContext = {}) => {
       team2Score += conferenceAdjustment / 2;
     }
 
-    // STEP 7: Blowout Cruise Control Factor
+    // STEP 11: Check for Extreme Mismatch (before cruise control and caps)
+    const extremeMismatch = calculateExtremeMismatch(team1, team2, team1Score, team2Score);
+    const isBottom10Opponent = (team1.netRank >= 356 || team2.netRank >= 356);
+    const skipCruiseControl = extremeMismatch.skipCruiseControl;
+    const skipEliteCaps = extremeMismatch.skipEliteCaps;
+
+    // STEP 7: Blowout Cruise Control Factor (skip if bottom 10 opponent)
     const preliminaryMargin = Math.abs(team1Score - team2Score);
-    const cruiseControl = calculateCruiseControl(preliminaryMargin, team1Score > team2Score ? 1 : 2);
-    
-    if (cruiseControl !== 0) {
-      if (team1Score > team2Score) {
-        team1Score += cruiseControl;
-      } else {
-        team2Score += cruiseControl;
+    let cruiseControl = 0;
+    if (!skipCruiseControl) {
+      cruiseControl = calculateCruiseControl(preliminaryMargin, team1Score > team2Score ? 1 : 2);
+      if (cruiseControl !== 0) {
+        if (team1Score > team2Score) {
+          team1Score += cruiseControl;
+        } else {
+          team2Score += cruiseControl;
+        }
       }
     }
 
-    // STEP 8: Elite Offense/Defense Caps
-    team1Score = applyEliteCaps(team1Score, team1, team2);
-    team2Score = applyEliteCaps(team2Score, team2, team1);
+    // STEP 8: Elite Offense/Defense Caps (skip if bottom 10 opponent)
+    if (!skipEliteCaps) {
+      team1Score = applyEliteCaps(team1Score, team1, team2);
+      team2Score = applyEliteCaps(team2Score, team2, team1);
+    }
 
     // STEP 9: Additional Contextual Adjustments
     const contextual1 = calculateContextualAdjustments(team1, gameContext);
     const contextual2 = calculateContextualAdjustments(team2, gameContext);
     team1Score += contextual1;
     team2Score += contextual2;
+
+    // STEP 11: Apply Extreme Mismatch Adjustments
+    const extremeAdjustments = extremeMismatch.adjustments;
+    team1Score += extremeAdjustments.team1;
+    team2Score += extremeAdjustments.team2;
+
+    // Apply floors for bottom 10 teams
+    if (extremeMismatch.applyFloor) {
+      if (team1.netRank >= 356) {
+        team1Score = Math.max(team1Score, extremeMismatch.floorValue);
+      }
+      if (team2.netRank >= 356) {
+        team2Score = Math.max(team2Score, extremeMismatch.floorValue);
+      }
+    }
+
+    // Cap winning team at realistic max (110) for extreme mismatches
+    if (extremeMismatch.applyMaxCap) {
+      if (team1Score > team2Score) {
+        team1Score = Math.min(team1Score, 110);
+      } else {
+        team2Score = Math.min(team2Score, 110);
+      }
+    }
 
     // Round final scores
     team1Score = Math.round(team1Score);
@@ -132,12 +167,13 @@ export const calculateV2Prediction = (team1, team2, gameContext = {}) => {
         location: locationAdjustments,
         conference: conferenceAdjustment,
         cruiseControl: cruiseControl,
-        contextual: { team1: contextual1, team2: contextual2 }
+        contextual: { team1: contextual1, team2: contextual2 },
+        extremeMismatch: extremeMismatch.adjustments
       }
     };
   } catch (error) {
-    console.error('Error in v2.0 prediction:', error);
-    throw new Error(`v2.0 Prediction failed: ${error.message}`);
+    console.error('Error in v2.1 prediction:', error);
+    throw new Error(`v2.1 Prediction failed: ${error.message}`);
   }
 };
 
@@ -447,6 +483,97 @@ const calculateContextualAdjustments = (team, context) => {
   if (context.missingRolePlayer) adjustment -= 2.5;
 
   return adjustment;
+};
+
+/**
+ * STEP 11: Extreme Mismatch Adjustments (v2.1 NEW)
+ * Handles bottom 10 teams, extreme NET gaps, and post-losing streak statement games
+ */
+const calculateExtremeMismatch = (team1, team2, team1Score, team2Score) => {
+  const net1 = team1.netRank || 150;
+  const net2 = team2.netRank || 150;
+  const netGap = Math.abs(net1 - net2);
+  
+  let adjustments = { team1: 0, team2: 0 };
+  let skipCruiseControl = false;
+  let skipEliteCaps = false;
+  let applyFloor = false;
+  let applyMaxCap = false;
+  let floorValue = 48; // Default floor for bottom 10 teams (48-52 range, use 48)
+
+  // 11A: Check for Bottom 10 Opponent (NET >= 356)
+  const isTeam1Bottom10 = net1 >= 356;
+  const isTeam2Bottom10 = net2 >= 356;
+  
+  if (isTeam1Bottom10 || isTeam2Bottom10) {
+    skipCruiseControl = true; // No cruise control for bottom 10 games
+    skipEliteCaps = true; // Remove elite caps for bottom 10 games
+    applyFloor = true; // Apply floor to bottom 10 team
+    applyMaxCap = true; // Cap winning team at 110
+    
+    // Determine which team is the better team (lower NET = better)
+    const team1IsBetter = net1 < net2;
+    
+    if (isTeam1Bottom10 && !isTeam2Bottom10) {
+      // Team 1 is bottom 10, Team 2 is the better team
+      adjustments.team2 += 12.5; // Winning team (better team): +10 to +15, use midpoint
+      adjustments.team1 -= 12.5; // Losing team (bottom 10): -10 to -15, use midpoint
+      floorValue = 48; // Floor at 45-55, use 48
+    } else if (isTeam2Bottom10 && !isTeam1Bottom10) {
+      // Team 2 is bottom 10, Team 1 is the better team
+      adjustments.team1 += 12.5; // Winning team (better team): +10 to +15, use midpoint
+      adjustments.team2 -= 12.5; // Losing team (bottom 10): -10 to -15, use midpoint
+      floorValue = 48; // Floor at 45-55, use 48
+    }
+  }
+
+  // 11B: Check for Extreme NET Gap (>= 200)
+  if (netGap >= 200 && !isTeam1Bottom10 && !isTeam2Bottom10) {
+    // Only apply if not already handled by bottom 10 rule
+    skipCruiseControl = true; // Remove cruise control for extreme gaps
+    const marginAdjustment = 17.5; // +15 to +20, use midpoint
+    
+    // Add to margin (favor the better team)
+    if (net1 < net2) {
+      // Team 1 is better
+      adjustments.team1 += marginAdjustment / 2;
+      adjustments.team2 -= marginAdjustment / 2;
+    } else {
+      // Team 2 is better
+      adjustments.team2 += marginAdjustment / 2;
+      adjustments.team1 -= marginAdjustment / 2;
+    }
+  }
+
+  // 11C: Post-Losing Streak Statement Game
+  // If favored team on 3+ loss streak AND vs Bottom 50 opponent
+  const team1LossStreak = team1.lossStreak || 0;
+  const team2LossStreak = team2.lossStreak || 0;
+  
+  if (team1LossStreak >= 3 && net2 >= 316) {
+    // Team 1 on losing streak, playing bottom 50 team
+    // Check if Team 1 is favored (lower NET rank = better)
+    if (net1 < net2) {
+      adjustments.team1 += 10; // +8 to +12, use midpoint
+    }
+  }
+  
+  if (team2LossStreak >= 3 && net1 >= 316) {
+    // Team 2 on losing streak, playing bottom 50 team
+    // Check if Team 2 is favored (lower NET rank = better)
+    if (net2 < net1) {
+      adjustments.team2 += 10; // +8 to +12, use midpoint
+    }
+  }
+
+  return {
+    adjustments,
+    skipCruiseControl,
+    skipEliteCaps,
+    applyFloor,
+    applyMaxCap,
+    floorValue
+  };
 };
 
 /**
