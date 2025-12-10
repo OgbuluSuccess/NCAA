@@ -228,7 +228,7 @@ const AIPredictionPage = ({ onBack }) => {
         // Show warnings but continue with prediction
       }
 
-      // Calculate AI prediction using v2.0 model
+      // Calculate AI prediction using v2.2 model
       // Ensure all required fields are present with defaults
       const team1ForV2 = {
         team: extracted.team1?.team || 'Team 1',
@@ -275,12 +275,12 @@ const AIPredictionPage = ({ onBack }) => {
         travelDistance: 0
       };
 
-      // Calculate AI prediction using v2.0 model
+      // Calculate AI prediction using v2.2 model
       const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
       setAiPrediction(v2Result);
 
-      // Calculate local prediction using THE SAME v2.0 model with THE SAME data
-      // Both predictions use identical v2.0 calculation - only difference is data source
+      // Calculate local prediction using THE SAME v2.2 model with THE SAME data
+      // Both predictions use identical v2.2 calculation - only difference is data source
       const localV2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
       setLocalPrediction(localV2Result);
 
@@ -409,7 +409,7 @@ const AIPredictionPage = ({ onBack }) => {
     return { teamName, stats };
   };
 
-  // Convert parsed stats to v2.0 format
+  // Convert parsed stats to v2.2 format
   const convertStatsToV2Format = (parsedData) => {
     const { teamName, stats } = parsedData;
     
@@ -557,7 +557,7 @@ const AIPredictionPage = ({ onBack }) => {
       setExtractedData(extracted);
       console.log('Manual Data Input:', JSON.stringify(extracted, null, 2));
 
-      // Validate and prepare data for v2.0 model (same as AI extraction)
+      // Validate and prepare data for v2.2 model (same as AI extraction)
       const team1ForV2 = {
         team: extracted.team1?.team || 'Team 1',
         ppg: extracted.team1?.ppg || 70,
@@ -603,7 +603,7 @@ const AIPredictionPage = ({ onBack }) => {
         travelDistance: 0
       };
 
-      // Calculate predictions using v2.0 model
+      // Calculate predictions using v2.2 model
       const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
       setAiPrediction(v2Result);
 
@@ -657,7 +657,7 @@ const AIPredictionPage = ({ onBack }) => {
             Upload Screenshot • AI Analysis • Dual Model Comparison
           </p>
           <p className="text-gray-400 mt-2">
-            Using ChatGPT Vision API + v2.0 Model (Both Predictions Use Same Model)
+            Using ChatGPT Vision API + v2.2 Model (Both Predictions Use Same Model)
           </p>
         </header>
 
@@ -978,13 +978,13 @@ const AIPredictionPage = ({ onBack }) => {
           {/* Predictions Display */}
           {(aiPrediction || localPrediction) && (
             <div className="space-y-6">
-              {/* AI Prediction (v2.0 Model) */}
+              {/* AI Prediction (v2.2 Model) */}
               {aiPrediction && (
                 <div className="card border-2 border-ncaa-yellow">
                   <div className="flex items-center space-x-2 mb-4">
                     <Sparkles className="w-6 h-6 text-ncaa-yellow" />
                     <h2 className="text-2xl font-bold text-white">
-                      AI Prediction (v2.0 Model)
+                      AI Prediction (v2.2 Model)
                     </h2>
                   </div>
                   
@@ -998,7 +998,7 @@ const AIPredictionPage = ({ onBack }) => {
                   <div className="flex items-center space-x-2 mb-4">
                     <Brain className="w-6 h-6 text-ncaa-blue" />
                     <h2 className="text-2xl font-bold text-white">
-                      Local Prediction (v2.0 Model)
+                      Local Prediction (v2.2 Model)
                     </h2>
                   </div>
                   
@@ -1119,13 +1119,13 @@ const ComparisonDisplay = ({ aiPrediction, localPrediction }) => {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-ncaa-gray rounded-lg p-4">
-          <h4 className="font-semibold text-white mb-2">AI (v2.0) Winner</h4>
+          <h4 className="font-semibold text-white mb-2">AI (v2.2) Winner</h4>
           <div className="text-xl font-bold text-ncaa-yellow">{aiWinner.name}</div>
           <div className="text-lg text-gray-300 mt-1">Score: {aiWinner.fullGame}</div>
           <div className="text-sm text-gray-400 mt-1">Total: {aiPrediction.total} • Margin: {aiPrediction.margin}</div>
         </div>
         <div className="bg-ncaa-gray rounded-lg p-4">
-          <h4 className="font-semibold text-white mb-2">Local (v2.0) Winner</h4>
+          <h4 className="font-semibold text-white mb-2">Local (v2.2) Winner</h4>
           <div className="text-xl font-bold text-ncaa-blue">{localWinner.name}</div>
           <div className="text-lg text-gray-300 mt-1">Score: {localWinner.fullGame}</div>
           <div className="text-sm text-gray-400 mt-1">Total: {localPrediction.total} • Margin: {localPrediction.margin}</div>

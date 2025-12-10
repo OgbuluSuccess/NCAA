@@ -1,12 +1,18 @@
 /**
- * NCAA Basketball Prediction Model v2.1
- * Complete implementation of the v2.1 specification
- * Includes v2.0 base model + STEP 11: Extreme Mismatch Adjustments
+ * NCAA Basketball Prediction Model v2.2
+ * Complete implementation of the v2.2 specification
+ * Includes v2.1 base model + v2.2 enhancements: Reclassified defensive tiers, Revised "Two Good Defenses" rule, Enhanced home/away, Scaled pace adjustments, Close Game Bonus
+ * Key v2.2 Changes:
+ * - Reclassified defensive tiers (Elite 1-30, Very Good 31-70, Good 71-110, Average 111-180)
+ * - Revised "Two Good Defenses" rule thresholds
+ * - Enhanced home/away adjustments
+ * - Scaled down pace adjustments (30-40% reduction)
+ * - Added Close Game Bonus for margins <5 points
  * DO NOT MODIFY - Use exactly as specified
  */
 
 /**
- * Calculate prediction using v2.1 model
+ * Calculate prediction using v2.2 model
  * @param {Object} team1 - First team data
  * @param {Object} team2 - Second team data
  * @param {Object} gameContext - Game context (home/away, conference, etc.)
@@ -16,7 +22,7 @@ export const calculateV2Prediction = (team1, team2, gameContext = {}) => {
   try {
     // VALIDATION: Check required fields before proceeding
     if (!team1 || !team2) {
-      throw new Error('Both teams are required for v2.0 prediction');
+      throw new Error('Both teams are required for v2.2 prediction');
     }
 
     if (!team1.team || !team2.team) {
@@ -131,6 +137,26 @@ export const calculateV2Prediction = (team1, team2, gameContext = {}) => {
       }
     }
 
+    // STEP 13: Close Game Bonus (v2.2 NEW)
+    // If preliminary margin <5 points (very close game), add +6 to +8 to total
+    // Check margin after all other adjustments but before close game bonus
+    const marginBeforeCloseBonus = Math.abs(team1Score - team2Score);
+    if (marginBeforeCloseBonus < 5) {
+      const closeGameBonus = 7; // Midpoint of +6 to +8
+      // Split evenly or favor home team slightly
+      if (gameContext.team1Location === 'home') {
+        team1Score += closeGameBonus * 0.55;
+        team2Score += closeGameBonus * 0.45;
+      } else if (gameContext.team1Location === 'away') {
+        team1Score += closeGameBonus * 0.45;
+        team2Score += closeGameBonus * 0.55;
+      } else {
+        // Neutral - split evenly
+        team1Score += closeGameBonus / 2;
+        team2Score += closeGameBonus / 2;
+      }
+    }
+
     // Round final scores
     team1Score = Math.round(team1Score);
     team2Score = Math.round(team2Score);
@@ -172,8 +198,8 @@ export const calculateV2Prediction = (team1, team2, gameContext = {}) => {
       }
     };
   } catch (error) {
-    console.error('Error in v2.1 prediction:', error);
-    throw new Error(`v2.1 Prediction failed: ${error.message}`);
+    console.error('Error in v2.2 prediction:', error);
+    throw new Error(`v2.2 Prediction failed: ${error.message}`);
   }
 };
 
@@ -201,10 +227,11 @@ const calculatePaceAdjustment = (team1, team2) => {
   else if (paceDiff >= 6) diffCategory = 'Moderate';
   else diffCategory = 'Neutral';
 
-  // Determine defensive quality
+  // v2.2: Determine defensive quality with new classification
   const getDefCategory = (defRank) => {
-    if (defRank <= 50) return 'Elite';
-    if (defRank <= 100) return 'Good';
+    if (defRank <= 30) return 'Elite';
+    if (defRank <= 70) return 'VeryGood';
+    if (defRank <= 110) return 'Good';
     return 'Average/Poor';
   };
 
@@ -235,10 +262,13 @@ const calculatePaceAdjustment = (team1, team2) => {
     }
   };
 
+  // v2.2: Updated category logic for new defensive tiers
   let category;
-  if ((def1 === 'Elite' || def1 === 'Good') && (def2 === 'Elite' || def2 === 'Good')) {
+  if ((def1 === 'Elite' || def1 === 'VeryGood' || def1 === 'Good') && 
+      (def2 === 'Elite' || def2 === 'VeryGood' || def2 === 'Good')) {
     category = 'Both Elite/Good';
-  } else if (def1 === 'Elite' || def1 === 'Good' || def2 === 'Elite' || def2 === 'Good') {
+  } else if (def1 === 'Elite' || def1 === 'VeryGood' || def1 === 'Good' || 
+             def2 === 'Elite' || def2 === 'VeryGood' || def2 === 'Good') {
     category = 'One Good';
   } else {
     category = 'Both Average/Poor';
@@ -246,12 +276,15 @@ const calculatePaceAdjustment = (team1, team2) => {
 
   const range = matrix[diffCategory][category];
   const adjustment = (range.min + range.max) / 2;
+  
+  // v2.2: Scale down pace adjustments by 35% (0.65 multiplier)
+  const scaledAdjustment = adjustment * 0.65;
 
   // Split adjustment (faster team gets more)
   if (pace1.poss > pace2.poss) {
-    return { team1: adjustment * 0.6, team2: adjustment * 0.4 };
+    return { team1: scaledAdjustment * 0.6, team2: scaledAdjustment * 0.4 };
   } else {
-    return { team1: adjustment * 0.4, team2: adjustment * 0.6 };
+    return { team1: scaledAdjustment * 0.4, team2: scaledAdjustment * 0.6 };
   }
 };
 
@@ -280,10 +313,10 @@ const calculateFormAdjustment = (team) => {
 };
 
 /**
- * STEP 4: Defense Quality Adjustment (CRITICAL)
+ * STEP 4: Defense Quality Adjustment (CRITICAL) - v2.2 UPDATED
  */
 const calculateDefenseQualityAdjustment = (team1, team2) => {
-  // Classify offense
+  // Classify offense (unchanged)
   const classifyOffense = (team) => {
     const ppgRank = team.ppgRank || 200; // Default if not provided
     const fgPct = team.fieldGoalPct || 0.45;
@@ -297,31 +330,84 @@ const calculateDefenseQualityAdjustment = (team1, team2) => {
   const off1 = classifyOffense(team1);
   const off2 = classifyOffense(team2);
 
-  // Defense quality
+  // v2.2: NEW Defense quality classification
   const getDefRank = (rank) => {
-    if (rank <= 50) return 'Elite';
-    if (rank <= 100) return 'Good';
-    if (rank <= 200) return 'Average';
-    return 'Poor';
+    if (rank <= 30) return 'Elite';
+    if (rank <= 70) return 'VeryGood';
+    if (rank <= 110) return 'Good';
+    if (rank <= 180) return 'Average';
+    if (rank <= 250) return 'BelowAvg';
+    if (rank <= 320) return 'Poor';
+    return 'Terrible';
   };
 
   const def1Rank = getDefRank(team1.defenseRank);
   const def2Rank = getDefRank(team2.defenseRank);
 
-  // Matrix
+  // v2.2: Updated Defense Impact Matrix
   const matrix = {
-    'Elite': { 'Elite': -9, 'Good': -5, 'Average': 2.5, 'Poor': 6 },
-    'Good': { 'Elite': -11, 'Good': -7, 'Average': 1, 'Poor': 4 },
-    'Average': { 'Elite': -13.5, 'Good': -9, 'Average': -1, 'Poor': 3 },
-    'Poor': { 'Elite': -16.5, 'Good': -11, 'Average': -6, 'Poor': 1 }
+    'Elite': { 
+      'Elite': -13.5,      // -12 to -15
+      'VeryGood': -9,      // -8 to -10
+      'Good': -5,          // -4 to -6
+      'Average': 1,        // 0 to +2
+      'BelowAvg': 4,       // +4 to +6
+      'Poor': 5,           // +4 to +6
+      'Terrible': 5        // +4 to +6
+    },
+    'Good': { 
+      'Elite': -16.5,      // -15 to -18
+      'VeryGood': -11,     // -10 to -12
+      'Good': -7,          // -6 to -8
+      'Average': -1,       // -2 to 0
+      'BelowAvg': 3,       // +2 to +4
+      'Poor': 3,           // +2 to +4
+      'Terrible': 3        // +2 to +4
+    },
+    'Average': { 
+      'Elite': -19,        // -18 to -20
+      'VeryGood': -13.5,   // -12 to -15
+      'Good': -9,          // -8 to -10
+      'Average': -1.5,     // -3 to -1
+      'BelowAvg': 1,       // 0 to +2
+      'Poor': 1,           // 0 to +2
+      'Terrible': 1        // 0 to +2
+    },
+    'Poor': { 
+      'Elite': -22.5,      // -20 to -25
+      'VeryGood': -16.5,   // -15 to -18
+      'Good': -11,         // -10 to -12
+      'Average': -7,       // -6 to -8
+      'BelowAvg': -1,      // -2 to 0
+      'Poor': -1,          // -2 to 0
+      'Terrible': -1       // -2 to 0
+    }
   };
 
-  let adj1 = matrix[off1][def2Rank];
-  let adj2 = matrix[off2][def1Rank];
+  let adj1 = matrix[off1][def2Rank] || 0;
+  let adj2 = matrix[off2][def1Rank] || 0;
 
-  // SPECIAL RULE: Two good defenses meet
-  if (team1.defenseRank <= 100 && team2.defenseRank <= 100) {
-    const additionalPenalty = -13.5; // Midpoint of -12 to -15
+  // v2.2: REVISED "Two Good Defenses" Rule
+  const def1RankNum = team1.defenseRank;
+  const def2RankNum = team2.defenseRank;
+  
+  if (def1RankNum <= 70 && def2RankNum <= 70) {
+    // Both teams Top 70 (Very Good or Elite): -10 to -12
+    const additionalPenalty = -11; // Midpoint of -10 to -12
+    adj1 += additionalPenalty / 2;
+    adj2 += additionalPenalty / 2;
+  } else if (def1RankNum >= 71 && def1RankNum <= 110 && def2RankNum >= 71 && def2RankNum <= 110) {
+    // Both teams 71-110 (Good): -5 to -7
+    const additionalPenalty = -6; // Midpoint of -5 to -7
+    adj1 += additionalPenalty / 2;
+    adj2 += additionalPenalty / 2;
+  } else if (def1RankNum >= 111 && def1RankNum <= 180 && def2RankNum >= 111 && def2RankNum <= 180) {
+    // Both teams 111-180 (Average): NO PENALTY (0)
+    // No adjustment needed
+  } else if ((def1RankNum <= 70 && def2RankNum >= 71 && def2RankNum <= 150) ||
+             (def2RankNum <= 70 && def1RankNum >= 71 && def1RankNum <= 150)) {
+    // One Top 70, one 71-150: -3 to -5
+    const additionalPenalty = -4; // Midpoint of -3 to -5
     adj1 += additionalPenalty / 2;
     adj2 += additionalPenalty / 2;
   }
@@ -330,66 +416,71 @@ const calculateDefenseQualityAdjustment = (team1, team2) => {
 };
 
 /**
- * STEP 5: Home/Away/Neutral Factor
+ * STEP 5: Home/Away/Neutral Factor - v2.2 ENHANCED
+ * MANDATORY: Game location must be identified first
  */
 const calculateLocationAdjustment = (team1, team2, context) => {
   let adj1 = 0;
   let adj2 = 0;
 
-  // Home team advantage
+  // v2.2: Enhanced Home team advantage
   if (context.team1Location === 'home') {
     const homeWinRate = team1.homeRecord ? team1.homeRecord.wins / (team1.homeRecord.wins + team1.homeRecord.losses) : 0.5;
     
-    if (homeWinRate >= 0.95) adj1 += 3.5;
-    else if (homeWinRate >= 0.80) adj1 += 2.5;
-    else if (homeWinRate >= 0.50) adj1 += 1.5;
-    else adj1 += 0.5;
+    // v2.2: Enhanced home bonuses
+    if (homeWinRate >= 0.75) adj1 += 3.5;      // Strong home record (75%+): +3 to +4
+    else if (homeWinRate >= 0.50) adj1 += 2.5; // Average home record (50-74%): +2 to +3
+    else adj1 += 1.5;                          // Weak home record (<50%): +1 to +2
 
-    // Away team penalty
+    // v2.2: Enhanced Away team penalty
     const awayWinRate = team2.awayRecord ? team2.awayRecord.wins / (team2.awayRecord.wins + team2.awayRecord.losses) : 0.5;
     const opponentNet = team1.netRank || 100;
     
-    if (opponentNet <= 50) {
-      if (awayWinRate <= 0.20) adj2 -= 6.5;
-      else if (awayWinRate <= 0.40) adj2 -= 5.5;
-      else if (awayWinRate <= 0.60) adj2 -= 3.5;
-      else adj2 -= 1.5;
-    } else if (opponentNet <= 150) {
-      if (awayWinRate <= 0.20) adj2 -= 5;
-      else if (awayWinRate <= 0.40) adj2 -= 4;
-      else if (awayWinRate <= 0.60) adj2 -= 2.5;
-      else adj2 -= 1;
+    // v2.2: Enhanced road penalties based on record
+    if (awayWinRate < 0.25 || (team2.awayRecord && team2.awayRecord.wins === 0 && team2.awayRecord.losses >= 3)) {
+      // Weak road record (0-3 or <25%): -4 to -6
+      if (opponentNet <= 50) adj2 -= 6;
+      else if (opponentNet <= 150) adj2 -= 5;
+      else adj2 -= 4;
+    } else if (awayWinRate < 0.60) {
+      // Average road record (25-60%): -2 to -4
+      if (opponentNet <= 50) adj2 -= 4;
+      else if (opponentNet <= 150) adj2 -= 3;
+      else adj2 -= 2.5;
     } else {
-      if (awayWinRate <= 0.20) adj2 -= 3.5;
-      else if (awayWinRate <= 0.40) adj2 -= 2.5;
-      else adj2 -= 1.5;
+      // Strong road record (60%+): -1 to -2
+      if (opponentNet <= 50) adj2 -= 2;
+      else if (opponentNet <= 150) adj2 -= 1.5;
+      else adj2 -= 1;
     }
   } else if (context.team1Location === 'away') {
-    // Reverse the above
+    // v2.2: Enhanced Away team penalty (Team 1 is away)
     const awayWinRate = team1.awayRecord ? team1.awayRecord.wins / (team1.awayRecord.wins + team1.awayRecord.losses) : 0.5;
     const opponentNet = team2.netRank || 100;
     
-    if (opponentNet <= 50) {
-      if (awayWinRate <= 0.20) adj1 -= 6.5;
-      else if (awayWinRate <= 0.40) adj1 -= 5.5;
-      else if (awayWinRate <= 0.60) adj1 -= 3.5;
-      else adj1 -= 1.5;
-    } else if (opponentNet <= 150) {
-      if (awayWinRate <= 0.20) adj1 -= 5;
-      else if (awayWinRate <= 0.40) adj1 -= 4;
-      else if (awayWinRate <= 0.60) adj1 -= 2.5;
-      else adj1 -= 1;
+    // v2.2: Enhanced road penalties based on record
+    if (awayWinRate < 0.25 || (team1.awayRecord && team1.awayRecord.wins === 0 && team1.awayRecord.losses >= 3)) {
+      // Weak road record (0-3 or <25%): -4 to -6
+      if (opponentNet <= 50) adj1 -= 6;
+      else if (opponentNet <= 150) adj1 -= 5;
+      else adj1 -= 4;
+    } else if (awayWinRate < 0.60) {
+      // Average road record (25-60%): -2 to -4
+      if (opponentNet <= 50) adj1 -= 4;
+      else if (opponentNet <= 150) adj1 -= 3;
+      else adj1 -= 2.5;
     } else {
-      if (awayWinRate <= 0.20) adj1 -= 3.5;
-      else if (awayWinRate <= 0.40) adj1 -= 2.5;
-      else adj1 -= 1.5;
+      // Strong road record (60%+): -1 to -2
+      if (opponentNet <= 50) adj1 -= 2;
+      else if (opponentNet <= 150) adj1 -= 1.5;
+      else adj1 -= 1;
     }
 
+    // v2.2: Enhanced Home team advantage (Team 2 is home)
     const homeWinRate = team2.homeRecord ? team2.homeRecord.wins / (team2.homeRecord.wins + team2.homeRecord.losses) : 0.5;
-    if (homeWinRate >= 0.95) adj2 += 3.5;
-    else if (homeWinRate >= 0.80) adj2 += 2.5;
-    else if (homeWinRate >= 0.50) adj2 += 1.5;
-    else adj2 += 0.5;
+    if (homeWinRate >= 0.75) adj2 += 3.5;      // Strong home record (75%+): +3 to +4
+    else if (homeWinRate >= 0.50) adj2 += 2.5; // Average home record (50-74%): +2 to +3
+    else adj2 += 1.5;                          // Weak home record (<50%): +1 to +2
   } else {
     // Neutral site
     const neutral1 = team1.neutralRecord ? team1.neutralRecord.wins / (team1.neutralRecord.wins + team1.neutralRecord.losses) : 0.5;
@@ -486,7 +577,7 @@ const calculateContextualAdjustments = (team, context) => {
 };
 
 /**
- * STEP 11: Extreme Mismatch Adjustments (v2.1 NEW)
+ * STEP 11: Extreme Mismatch Adjustments (v2.1, retained in v2.2)
  * Handles bottom 10 teams, extreme NET gaps, and post-losing streak statement games
  */
 const calculateExtremeMismatch = (team1, team2, team1Score, team2Score) => {
