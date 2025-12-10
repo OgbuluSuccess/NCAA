@@ -148,6 +148,10 @@ const AIPredictionPage = ({ onBack }) => {
         ? 'http://localhost:3000/api/analyze-image' // Vercel CLI default port
         : '/api/analyze-image'; // Production path
       
+      console.log('🤖 Calling AI (OpenAI GPT-4o Vision) to extract data from image...');
+      console.log('📡 API Endpoint:', apiUrl);
+      console.log('🖼️ Image size:', (base64Image.length / 1024).toFixed(2), 'KB (base64)');
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -197,7 +201,10 @@ const AIPredictionPage = ({ onBack }) => {
       setExtractedData(extracted);
 
       // Log extracted data for debugging
-      console.log('Extracted Data from AI:', JSON.stringify(extracted, null, 2));
+      console.log('✅ AI Extraction Complete!');
+      console.log('📊 Extracted Data from AI (ChatGPT Vision):', JSON.stringify(extracted, null, 2));
+      console.log('🔍 Team 1:', extracted.team1?.team, '| PPG:', extracted.team1?.ppg, '| Defense Rank:', extracted.team1?.defenseRank);
+      console.log('🔍 Team 2:', extracted.team2?.team, '| PPG:', extracted.team2?.ppg, '| Defense Rank:', extracted.team2?.defenseRank);
 
       // Validate extracted data
       const validationErrors = [];
@@ -275,13 +282,23 @@ const AIPredictionPage = ({ onBack }) => {
         travelDistance: 0
       };
 
-      // Calculate AI prediction using v2.2 model
+      // Calculate AI prediction using v2.2 model with AI-extracted data
+      console.log('🧮 Calculating prediction using v2.2 model with AI-extracted data...');
+      console.log('📥 Input Data - Team 1:', team1ForV2.team, 'PPG:', team1ForV2.ppg, 'Def Rank:', team1ForV2.defenseRank);
+      console.log('📥 Input Data - Team 2:', team2ForV2.team, 'PPG:', team2ForV2.ppg, 'Def Rank:', team2ForV2.defenseRank);
+      console.log('📥 Game Context:', gameContext);
+      
       const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
+      console.log('✅ AI Prediction (v2.2 Model) Result:', v2Result);
       setAiPrediction(v2Result);
 
       // Calculate local prediction using THE SAME v2.2 model with THE SAME data
       // Both predictions use identical v2.2 calculation - only difference is data source
+      // NOTE: Since both use same data and same model, results will be identical
+      console.log('🧮 Calculating Local Prediction using SAME v2.2 model with SAME data...');
       const localV2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
+      console.log('✅ Local Prediction (v2.2 Model) Result:', localV2Result);
+      console.log('📊 Both predictions use: Same v2.2 model + Same AI-extracted data = Identical results');
       setLocalPrediction(localV2Result);
 
     } catch (err) {
@@ -548,16 +565,76 @@ const AIPredictionPage = ({ onBack }) => {
       }
 
       // Combine into extracted format
-      const extracted = {
+      const rawData = {
         team1: team1Data,
         team2: team2Data,
         gameContext: gameContextData
       };
 
+      console.log('📝 Manual Text Input Parsed');
+      console.log('📊 Raw Parsed Data:', JSON.stringify(rawData, null, 2));
+
+      // Send to AI for analysis with model information
+      console.log('🤖 Sending data to AI for analysis with v2.2 model...');
+      const apiUrl = import.meta.env.DEV 
+        ? 'http://localhost:3000/api/analyze-data' // Vercel CLI default port
+        : '/api/analyze-data'; // Production path
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          teamData: rawData,
+          modelVersion: 'v2.2'
+        })
+      });
+
+      // Check if response is OK before parsing JSON
+      if (!response.ok) {
+        let errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        }
+        
+        if (response.status === 404) {
+          errorMessage = 'API endpoint not found. For local development:\n\n1. Install Vercel CLI: npm install -g vercel\n2. Create .env.local with: OPENAI_API_KEY=your_key\n3. Run: vercel dev\n\nOr deploy to Vercel for production use.';
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Parse JSON only if response is OK
+      let result;
+      try {
+        const text = await response.text();
+        if (!text) {
+          throw new Error('Empty response from server');
+        }
+        result = JSON.parse(text);
+      } catch (parseError) {
+        throw new Error(`Failed to parse server response: ${parseError.message}`);
+      }
+      
+      if (!result.success || !result.data) {
+        throw new Error('Invalid response from server');
+      }
+
+      const extracted = result.data;
       setExtractedData(extracted);
-      console.log('Manual Data Input:', JSON.stringify(extracted, null, 2));
+
+      console.log('✅ AI Analysis Complete!');
+      console.log('📊 AI-Validated Data:', JSON.stringify(extracted, null, 2));
+      console.log('🔍 Team 1:', extracted.team1?.team, '| PPG:', extracted.team1?.ppg, '| Defense Rank:', extracted.team1?.defenseRank);
+      console.log('🔍 Team 2:', extracted.team2?.team, '| PPG:', extracted.team2?.ppg, '| Defense Rank:', extracted.team2?.defenseRank);
 
       // Validate and prepare data for v2.2 model (same as AI extraction)
+      console.log('🔧 Preparing data for v2.2 model calculation...');
       const team1ForV2 = {
         team: extracted.team1?.team || 'Team 1',
         ppg: extracted.team1?.ppg || 70,
@@ -603,12 +680,22 @@ const AIPredictionPage = ({ onBack }) => {
         travelDistance: 0
       };
 
-      // Calculate predictions using v2.2 model
+      // Calculate predictions using v2.2 model with AI-analyzed data
+      console.log('🧮 Calculating prediction using v2.2 model with AI-analyzed data...');
+      console.log('📥 Input Data - Team 1:', team1ForV2.team, 'PPG:', team1ForV2.ppg, 'Def Rank:', team1ForV2.defenseRank);
+      console.log('📥 Input Data - Team 2:', team2ForV2.team, 'PPG:', team2ForV2.ppg, 'Def Rank:', team2ForV2.defenseRank);
+      console.log('📥 Game Context:', gameContext);
+      
       const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
+      console.log('✅ AI Prediction (v2.2 Model) Result:', v2Result);
       setAiPrediction(v2Result);
 
-      // Local prediction uses same model and data
+      // Local prediction uses same AI-analyzed data and same model
+      // NOTE: Since both use same AI-analyzed data and same model, results will be identical
+      console.log('🧮 Calculating Local Prediction using SAME v2.2 model with SAME AI-analyzed data...');
       const localV2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
+      console.log('✅ Local Prediction (v2.2 Model) Result:', localV2Result);
+      console.log('📊 Both predictions use: Same v2.2 model + Same AI-analyzed data = Identical results');
       setLocalPrediction(localV2Result);
 
     } catch (err) {
@@ -844,12 +931,12 @@ const AIPredictionPage = ({ onBack }) => {
                   {isProcessing ? (
                     <>
                       <Loader className="w-4 h-4 animate-spin" />
-                      <span>Processing with AI...</span>
+                      <span>Calling AI (GPT-4o Vision)...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>Analyze Selected Image</span>
+                      <span>Analyze with AI</span>
                     </>
                   )}
                 </button>
@@ -875,9 +962,15 @@ const AIPredictionPage = ({ onBack }) => {
           {/* Manual Input Section */}
           {inputMode === 'manual' && (
             <div className="card">
-              <h2 className="text-xl font-bold text-white mb-4">
-                Manual Data Input
-              </h2>
+              <div className="flex items-center space-x-2 mb-4">
+                <Brain className="w-6 h-6 text-ncaa-blue" />
+                <h2 className="text-xl font-bold text-white">
+                  Manual Data Input (v2.2 Model)
+                </h2>
+              </div>
+              <p className="text-sm text-gray-300 mb-4">
+                Enter team statistics manually. Data will be sent to AI (ChatGPT) for analysis and validation with v2.2 model context, then used for prediction.
+              </p>
               
               <div className="space-y-4">
                 <p className="text-gray-300 text-sm mb-4">
@@ -938,12 +1031,12 @@ const AIPredictionPage = ({ onBack }) => {
                     {isProcessing ? (
                       <>
                         <Loader className="w-4 h-4 animate-spin" />
-                        <span>Processing...</span>
+                        <span>AI Analyzing with v2.2 Model...</span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        <span>Calculate Prediction</span>
+                        <span>Send to AI for Analysis</span>
                       </>
                     )}
                   </button>
@@ -960,13 +1053,47 @@ const AIPredictionPage = ({ onBack }) => {
             </div>
           )}
 
+          {/* Processing Status */}
+          {isProcessing && (
+            <div className="card bg-ncaa-gray-light border-2 border-ncaa-yellow">
+              <div className="flex items-center space-x-3">
+                <Loader className="w-5 h-5 animate-spin text-ncaa-yellow" />
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    {inputMode === 'image' ? 'AI Analysis in Progress' : 'AI Analysis in Progress'}
+                  </h3>
+                  <p className="text-sm text-gray-300">
+                    {inputMode === 'image' 
+                      ? '🤖 Calling OpenAI GPT-4o Vision API to extract team statistics from image...'
+                      : '🤖 Calling OpenAI GPT-4o API to analyze manual input data with v2.2 model context...'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {inputMode === 'image' 
+                      ? 'This may take 5-15 seconds depending on image complexity'
+                      : 'AI is validating and enhancing your data for v2.2 model (3-8 seconds)'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Extracted Data Debug View */}
-          {extractedData && (
+          {extractedData && !isProcessing && (
             <div className="card bg-ncaa-gray-light border border-ncaa-blue">
-              <h3 className="text-lg font-bold text-white mb-3">Extracted Data (Debug View)</h3>
+              <div className="flex items-center space-x-2 mb-3">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <h3 className="text-lg font-bold text-white">
+                  {inputMode === 'image' ? '✅ AI Extraction Complete' : '✅ AI Analysis Complete'}
+                </h3>
+              </div>
+              <p className="text-sm text-gray-300 mb-3">
+                {inputMode === 'image' 
+                  ? 'Data extracted by ChatGPT Vision API (GPT-4o) and used with v2.2 model'
+                  : 'Data analyzed and validated by ChatGPT API (GPT-4o) with v2.2 model context, then used for prediction'}
+              </p>
               <details className="text-sm">
                 <summary className="cursor-pointer text-ncaa-blue hover:text-ncaa-yellow mb-2 font-semibold">
-                  Click to view raw extracted data from AI
+                  Click to view {inputMode === 'image' ? 'raw extracted data from AI' : 'AI-analyzed data'}
                 </summary>
                 <pre className="bg-black/50 p-4 rounded overflow-auto text-xs text-gray-300 max-h-96">
                   {JSON.stringify(extractedData, null, 2)}
