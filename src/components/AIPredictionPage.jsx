@@ -1196,6 +1196,13 @@ const PredictionDisplay = ({ prediction, modelType }) => {
     const inputs = prediction?.inputs;
     const calcs = prediction?.calculations;
 
+    const getWinPct = (record) => {
+      if (!record || typeof record.wins !== 'number' || typeof record.losses !== 'number') return null;
+      const games = record.wins + record.losses;
+      if (games <= 0) return null;
+      return record.wins / games;
+    };
+
     const getDefenseTier = (rank) => {
       if (typeof rank !== 'number') return 'Unknown';
       if (rank <= 30) return 'Elite (1-30)';
@@ -1215,6 +1222,103 @@ const PredictionDisplay = ({ prediction, modelType }) => {
       if (ppg >= 70) return 'Moderate';
       if (ppg >= 65) return 'Slow';
       return 'Very Slow';
+    };
+
+    // Simple "might score higher/lower than predicted" indicator (UI-only; does NOT change v2.2 model)
+    const getScoreLean = (teamIndex) => {
+      const t = teamIndex === 1 ? inputs?.team1 : inputs?.team2;
+      const o = teamIndex === 1 ? inputs?.team2 : inputs?.team1;
+      const ctx = inputs?.gameContext || {};
+      const isTeam1 = teamIndex === 1;
+      const teamIsHome = isTeam1 ? ctx.team1Location === 'home' : ctx.team1Location === 'away';
+      const teamIsAway = isTeam1 ? ctx.team1Location === 'away' : ctx.team1Location === 'home';
+
+      let score = 0;
+      const reasons = [];
+
+      // Pace (more possessions → slight upside)
+      const paceCat = getPaceCategory(t?.ppg);
+      if (paceCat === 'Very Fast') { score += 0.75; reasons.push('Very fast pace'); }
+      else if (paceCat === 'Fast') { score += 0.4; reasons.push('Fast pace'); }
+      else if (paceCat === 'Very Slow') { score -= 0.4; reasons.push('Very slow pace'); }
+
+      // Offense strength (PPG proxy)
+      if (typeof t?.ppg === 'number') {
+        if (t.ppg >= 85) { score += 0.75; reasons.push('High-scoring offense'); }
+        else if (t.ppg >= 78) { score += 0.4; reasons.push('Above-average offense'); }
+        else if (t.ppg <= 62) { score -= 0.4; reasons.push('Low-scoring offense'); }
+      }
+
+      // Opponent defense tier (weaker defense → upside)
+      if (typeof o?.defenseRank === 'number') {
+        if (o.defenseRank >= 321) { score += 0.75; reasons.push('Opponent terrible defense'); }
+        else if (o.defenseRank >= 251) { score += 0.5; reasons.push('Opponent poor defense'); }
+        else if (o.defenseRank <= 30) { score -= 0.75; reasons.push('Opponent elite defense'); }
+        else if (o.defenseRank <= 70) { score -= 0.5; reasons.push('Opponent very good defense'); }
+      }
+
+      // Shooting efficiency (minor)
+      if (typeof t?.threePointPct === 'number') {
+        if (t.threePointPct >= 0.38) { score += 0.25; reasons.push('Strong 3PT%'); }
+        else if (t.threePointPct <= 0.30) { score -= 0.25; reasons.push('Weak 3PT%'); }
+      }
+      if (typeof t?.freeThrowPct === 'number') {
+        if (t.freeThrowPct >= 0.76) { score += 0.2; reasons.push('Strong FT%'); }
+        else if (t.freeThrowPct <= 0.67) { score -= 0.2; reasons.push('Weak FT%'); }
+      }
+
+      // Location + record (minor)
+      const homePct = getWinPct(t?.homeRecord);
+      const awayPct = getWinPct(t?.awayRecord);
+      if (teamIsHome && homePct != null) {
+        if (homePct >= 0.75) { score += 0.25; reasons.push('Strong home record'); }
+        else if (homePct <= 0.35) { score -= 0.2; reasons.push('Weak home record'); }
+      }
+      if (teamIsAway && awayPct != null) {
+        if (awayPct <= 0.35) { score -= 0.35; reasons.push('Weak away record'); }
+        else if (awayPct >= 0.65) { score += 0.15; reasons.push('Strong away record'); }
+      }
+
+      // Conference game tends to suppress scoring (both)
+      if (ctx.isConferenceGame) { score -= 0.25; reasons.push('Conference game (tighter)'); }
+
+      // "Two good defenses" heuristic (both teams strong defenses suppress points)
+      if (typeof inputs?.team1?.defenseRank === 'number' && typeof inputs?.team2?.defenseRank === 'number') {
+        const d1 = inputs.team1.defenseRank;
+        const d2 = inputs.team2.defenseRank;
+        if (d1 <= 70 && d2 <= 70) { score -= 0.5; reasons.push('Both teams strong defenses'); }
+        else if (d1 <= 110 && d2 <= 110) { score -= 0.25; reasons.push('Both teams good defenses'); }
+      }
+
+      // Extreme mismatch adjustments (if model applied big ones, reflect direction a bit)
+      const em = calcs?.extremeMismatch;
+      if (em && typeof em.team1 === 'number' && typeof em.team2 === 'number') {
+        const emVal = isTeam1 ? em.team1 : em.team2;
+        if (emVal >= 8) { score += 0.35; reasons.push('Extreme mismatch advantage'); }
+        else if (emVal <= -8) { score -= 0.35; reasons.push('Extreme mismatch disadvantage'); }
+      }
+
+      // Cruise control indicates blowout risk; winner may have upside if they *don’t* cruise as much (small)
+      if (typeof calcs?.cruiseControl === 'number' && calcs.cruiseControl !== 0) {
+        const isWinner = isTeam1 ? prediction?.team1?.isWinner : prediction?.team2?.isWinner;
+        if (isWinner) { score += 0.2; reasons.push('Blowout risk (pace/bench variance)'); }
+      }
+
+      // Final label
+      let label = 'Neutral';
+      let direction = 'neutral';
+      let color = 'bg-ncaa-gray border-gray-600 text-gray-200';
+      if (score >= 0.9) {
+        label = 'Likely Higher';
+        direction = 'up';
+        color = 'bg-green-500/15 border-green-500/40 text-green-200';
+      } else if (score <= -0.9) {
+        label = 'Likely Lower';
+        direction = 'down';
+        color = 'bg-red-500/15 border-red-500/40 text-red-200';
+      }
+
+      return { label, direction, color, score, reasons: reasons.slice(0, 3) };
     };
 
     return (
@@ -1380,6 +1484,20 @@ const PredictionDisplay = ({ prediction, modelType }) => {
             <div className={`text-center p-4 rounded-lg ${prediction.team1.isWinner ? 'bg-ncaa-green/30' : 'bg-ncaa-gray'}`}>
               <div className="text-2xl font-bold text-white">{prediction.team1.name}</div>
               <div className="text-3xl font-bold text-ncaa-yellow mt-2">{prediction.team1.fullGame}</div>
+              {(() => {
+                const lean = getScoreLean(1);
+                return (
+                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                    <span className="font-semibold">Score vs predicted:</span>
+                    <span className="font-bold">
+                      {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
+                    </span>
+                    {lean.reasons?.length ? (
+                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                    ) : null}
+                  </div>
+                );
+              })()}
               {prediction.team1.isWinner && (
                 <div className="text-sm text-green-300 mt-1">Winner</div>
               )}
@@ -1387,6 +1505,20 @@ const PredictionDisplay = ({ prediction, modelType }) => {
             <div className={`text-center p-4 rounded-lg ${prediction.team2.isWinner ? 'bg-ncaa-green/30' : 'bg-ncaa-gray'}`}>
               <div className="text-2xl font-bold text-white">{prediction.team2.name}</div>
               <div className="text-3xl font-bold text-ncaa-yellow mt-2">{prediction.team2.fullGame}</div>
+              {(() => {
+                const lean = getScoreLean(2);
+                return (
+                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                    <span className="font-semibold">Score vs predicted:</span>
+                    <span className="font-bold">
+                      {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
+                    </span>
+                    {lean.reasons?.length ? (
+                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                    ) : null}
+                  </div>
+                );
+              })()}
               {prediction.team2.isWinner && (
                 <div className="text-sm text-green-300 mt-1">Winner</div>
               )}
@@ -1405,10 +1537,38 @@ const PredictionDisplay = ({ prediction, modelType }) => {
             <div className="text-center p-4 rounded-lg bg-ncaa-gray">
               <div className="text-xl font-bold text-white">{prediction.team1.name}</div>
               <div className="text-2xl font-bold text-ncaa-blue mt-2">{prediction.team1.firstHalf}</div>
+              {(() => {
+                const lean = getScoreLean(1);
+                return (
+                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                    <span className="font-semibold">1H vs predicted:</span>
+                    <span className="font-bold">
+                      {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
+                    </span>
+                    {lean.reasons?.length ? (
+                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                    ) : null}
+                  </div>
+                );
+              })()}
             </div>
             <div className="text-center p-4 rounded-lg bg-ncaa-gray">
               <div className="text-xl font-bold text-white">{prediction.team2.name}</div>
               <div className="text-2xl font-bold text-ncaa-blue mt-2">{prediction.team2.firstHalf}</div>
+              {(() => {
+                const lean = getScoreLean(2);
+                return (
+                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                    <span className="font-semibold">1H vs predicted:</span>
+                    <span className="font-bold">
+                      {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
+                    </span>
+                    {lean.reasons?.length ? (
+                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                    ) : null}
+                  </div>
+                );
+              })()}
             </div>
           </div>
           <div className="mt-4 text-center text-lg text-gray-300">
