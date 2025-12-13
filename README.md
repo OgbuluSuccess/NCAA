@@ -97,7 +97,7 @@ npm run dev
 3. **Analyze with AI**:
    - Click "Analyze with AI" button
    - The AI will read the image and extract team data
-   - Uses ChatGPT's latest vision model (gpt-4o)
+   - Uses OpenAI's latest model (default: gpt-5.2; configurable via OPENAI_MODEL)
 4. **View Results**:
    - **AI Prediction (v2.0 Model)**: Uses the exact v2.0 specification model
    - **Local Prediction**: Uses the enhanced local prediction engine

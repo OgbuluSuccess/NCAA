@@ -148,7 +148,7 @@ const AIPredictionPage = ({ onBack }) => {
         ? 'http://localhost:3000/api/analyze-image' // Vercel CLI default port
         : '/api/analyze-image'; // Production path
       
-      console.log('🤖 Calling AI (OpenAI GPT-4o Vision) to extract data from image...');
+      console.log('🤖 Calling AI (OpenAI GPT-5.2 Vision) to extract data from image...');
       console.log('📡 API Endpoint:', apiUrl);
       console.log('🖼️ Image size:', (base64Image.length / 1024).toFixed(2), 'KB (base64)');
       
@@ -198,6 +198,15 @@ const AIPredictionPage = ({ onBack }) => {
       }
 
       const extracted = result.data;
+      
+      // Replace "Unknown Team" with "Team 1" or "Team 2" if needed
+      if (!extracted.team1?.team || extracted.team1.team === 'Unknown Team' || extracted.team1.team.trim() === '') {
+        extracted.team1.team = 'Team 1';
+      }
+      if (!extracted.team2?.team || extracted.team2.team === 'Unknown Team' || extracted.team2.team.trim() === '') {
+        extracted.team2.team = 'Team 2';
+      }
+      
       setExtractedData(extracted);
 
       // Log extracted data for debugging
@@ -289,17 +298,28 @@ const AIPredictionPage = ({ onBack }) => {
       console.log('📥 Game Context:', gameContext);
       
       const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
-      console.log('✅ AI Prediction (v2.2 Model) Result:', v2Result);
-      setAiPrediction(v2Result);
+      const v2ResultEnriched = {
+        ...v2Result,
+        inputs: { team1: team1ForV2, team2: team2ForV2, gameContext },
+        recommendation: {
+          focus: 'halftime_team_scoring',
+          label: 'Halftime (team scoring)',
+          reason:
+            "Generally fewer random factors than individual player props; more stable inputs like pace, efficiency, defense quality, and matchup. It's effectively a shorter window of the same team-scoring model."
+        }
+      };
+      console.log('✅ AI Prediction (v2.2 Model) Result:', v2ResultEnriched);
+      setAiPrediction(v2ResultEnriched);
 
       // Calculate local prediction using THE SAME v2.2 model with THE SAME data
       // Both predictions use identical v2.2 calculation - only difference is data source
       // NOTE: Since both use same data and same model, results will be identical
       console.log('🧮 Calculating Local Prediction using SAME v2.2 model with SAME data...');
       const localV2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
-      console.log('✅ Local Prediction (v2.2 Model) Result:', localV2Result);
+      const localV2ResultEnriched = { ...localV2Result, recommendation: v2ResultEnriched.recommendation };
+      console.log('✅ Local Prediction (v2.2 Model) Result:', localV2ResultEnriched);
       console.log('📊 Both predictions use: Same v2.2 model + Same AI-extracted data = Identical results');
-      setLocalPrediction(localV2Result);
+      setLocalPrediction(localV2ResultEnriched);
 
     } catch (err) {
       console.error('AI processing error:', err);
@@ -337,7 +357,7 @@ const AIPredictionPage = ({ onBack }) => {
   };
 
   // Parse text format stats (e.g., "Team1, Team Stats - Through games 12/07/2025\nStat\tRank\tValue\n...")
-  const parseTextStats = (text) => {
+  const parseTextStats = (text, teamNumber = 1) => {
     const lines = text.trim().split(/\r?\n/).map(line => line.trim()).filter(line => line);
     if (lines.length < 3) {
       throw new Error('Text format must have at least a header line, column headers, and one data row');
@@ -346,7 +366,7 @@ const AIPredictionPage = ({ onBack }) => {
     // Extract team name from first line (format: "TeamName, Team Stats - Through games ...")
     const firstLine = lines[0];
     const teamNameMatch = firstLine.match(/^([^,]+),/);
-    const teamName = teamNameMatch ? teamNameMatch[1].trim() : 'Unknown Team';
+    const teamName = teamNameMatch ? teamNameMatch[1].trim() : `Team ${teamNumber}`;
 
     // Find header row (should contain "Stat", "Rank", "Value")
     let headerRowIndex = -1;
@@ -529,7 +549,7 @@ const AIPredictionPage = ({ onBack }) => {
       } catch (e) {
         // Not JSON, try text format
         try {
-          const parsed = parseTextStats(manualTeam1Data);
+          const parsed = parseTextStats(manualTeam1Data, 1);
           team1Data = convertStatsToV2Format(parsed);
         } catch (textError) {
           throw new Error(`Team 1 data is not valid JSON or text format: ${e.message}`);
@@ -542,7 +562,7 @@ const AIPredictionPage = ({ onBack }) => {
       } catch (e) {
         // Not JSON, try text format
         try {
-          const parsed = parseTextStats(manualTeam2Data);
+          const parsed = parseTextStats(manualTeam2Data, 2);
           team2Data = convertStatsToV2Format(parsed);
         } catch (textError) {
           throw new Error(`Team 2 data is not valid JSON or text format: ${e.message}`);
@@ -626,6 +646,15 @@ const AIPredictionPage = ({ onBack }) => {
       }
 
       const extracted = result.data;
+      
+      // Replace "Unknown Team" with "Team 1" or "Team 2" if needed
+      if (!extracted.team1?.team || extracted.team1.team === 'Unknown Team' || extracted.team1.team.trim() === '') {
+        extracted.team1.team = 'Team 1';
+      }
+      if (!extracted.team2?.team || extracted.team2.team === 'Unknown Team' || extracted.team2.team.trim() === '') {
+        extracted.team2.team = 'Team 2';
+      }
+      
       setExtractedData(extracted);
 
       console.log('✅ AI Analysis Complete!');
@@ -687,16 +716,27 @@ const AIPredictionPage = ({ onBack }) => {
       console.log('📥 Game Context:', gameContext);
       
       const v2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
-      console.log('✅ AI Prediction (v2.2 Model) Result:', v2Result);
-      setAiPrediction(v2Result);
+      const v2ResultEnriched = {
+        ...v2Result,
+        inputs: { team1: team1ForV2, team2: team2ForV2, gameContext },
+        recommendation: {
+          focus: 'halftime_team_scoring',
+          label: 'Halftime (team scoring)',
+          reason:
+            "Generally fewer random factors than individual player props; more stable inputs like pace, efficiency, defense quality, and matchup. It's effectively a shorter window of the same team-scoring model."
+        }
+      };
+      console.log('✅ AI Prediction (v2.2 Model) Result:', v2ResultEnriched);
+      setAiPrediction(v2ResultEnriched);
 
       // Local prediction uses same AI-analyzed data and same model
       // NOTE: Since both use same AI-analyzed data and same model, results will be identical
       console.log('🧮 Calculating Local Prediction using SAME v2.2 model with SAME AI-analyzed data...');
       const localV2Result = calculateV2Prediction(team1ForV2, team2ForV2, gameContext);
-      console.log('✅ Local Prediction (v2.2 Model) Result:', localV2Result);
+      const localV2ResultEnriched = { ...localV2Result, recommendation: v2ResultEnriched.recommendation };
+      console.log('✅ Local Prediction (v2.2 Model) Result:', localV2ResultEnriched);
       console.log('📊 Both predictions use: Same v2.2 model + Same AI-analyzed data = Identical results');
-      setLocalPrediction(localV2Result);
+      setLocalPrediction(localV2ResultEnriched);
 
     } catch (err) {
       console.error('Manual data processing error:', err);
@@ -931,7 +971,7 @@ const AIPredictionPage = ({ onBack }) => {
                   {isProcessing ? (
                     <>
                       <Loader className="w-4 h-4 animate-spin" />
-                      <span>Calling AI (GPT-4o Vision)...</span>
+                      <span>Calling AI (GPT-5.2 Vision)...</span>
                     </>
                   ) : (
                     <>
@@ -1064,8 +1104,8 @@ const AIPredictionPage = ({ onBack }) => {
                   </h3>
                   <p className="text-sm text-gray-300">
                     {inputMode === 'image' 
-                      ? '🤖 Calling OpenAI GPT-4o Vision API to extract team statistics from image...'
-                      : '🤖 Calling OpenAI GPT-4o API to analyze manual input data with v2.2 model context...'}
+                      ? '🤖 Calling OpenAI GPT-5.2 Vision API to extract team statistics from image...'
+                      : '🤖 Calling OpenAI GPT-5.2 API to analyze manual input data with v2.2 model context...'}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     {inputMode === 'image' 
@@ -1088,8 +1128,8 @@ const AIPredictionPage = ({ onBack }) => {
               </div>
               <p className="text-sm text-gray-300 mb-3">
                 {inputMode === 'image' 
-                  ? 'Data extracted by ChatGPT Vision API (GPT-4o) and used with v2.2 model'
-                  : 'Data analyzed and validated by ChatGPT API (GPT-4o) with v2.2 model context, then used for prediction'}
+                  ? 'Data extracted by ChatGPT Vision API (GPT-5.2) and used with v2.2 model'
+                  : 'Data analyzed and validated by ChatGPT API (GPT-5.2) with v2.2 model context, then used for prediction'}
               </p>
               <details className="text-sm">
                 <summary className="cursor-pointer text-ncaa-blue hover:text-ncaa-yellow mb-2 font-semibold">
@@ -1153,8 +1193,186 @@ const AIPredictionPage = ({ onBack }) => {
 // Prediction Display Component
 const PredictionDisplay = ({ prediction, modelType }) => {
   if (modelType === 'v2') {
+    const inputs = prediction?.inputs;
+    const calcs = prediction?.calculations;
+
+    const getDefenseTier = (rank) => {
+      if (typeof rank !== 'number') return 'Unknown';
+      if (rank <= 30) return 'Elite (1-30)';
+      if (rank <= 70) return 'Very Good (31-70)';
+      if (rank <= 110) return 'Good (71-110)';
+      if (rank <= 180) return 'Average (111-180)';
+      if (rank <= 250) return 'Below Avg (181-250)';
+      if (rank <= 320) return 'Poor (251-320)';
+      if (rank <= 363) return 'Terrible (321-363)';
+      return 'Unknown';
+    };
+
+    const getPaceCategory = (ppg) => {
+      if (typeof ppg !== 'number') return 'Unknown';
+      if (ppg >= 85) return 'Very Fast';
+      if (ppg >= 78) return 'Fast';
+      if (ppg >= 70) return 'Moderate';
+      if (ppg >= 65) return 'Slow';
+      return 'Very Slow';
+    };
+
     return (
       <div className="space-y-4">
+        {/* Recommendation */}
+        {prediction?.recommendation && (
+          <div className="bg-ncaa-blue/20 border border-ncaa-blue rounded-lg p-4">
+            <div className="text-sm font-semibold text-white">
+              Recommended focus: {prediction.recommendation.label}
+            </div>
+            <div className="text-xs text-gray-300 mt-1">
+              {prediction.recommendation.reason}
+            </div>
+          </div>
+        )}
+
+        {/* Key Factors (pace / efficiency / defense / matchup) */}
+        {(inputs || calcs) && (
+          <div className="bg-ncaa-gray-light rounded-lg p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-white font-bold text-base">Key Factors Used (v2.2)</div>
+                <div className="text-xs text-gray-300 mt-1">
+                  These are the exact inputs + adjustments the v2.2 engine applied to build the final scores.
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Pace */}
+              <div className="bg-ncaa-gray rounded-lg border border-gray-700 p-4">
+                <div className="text-white font-semibold">Pace</div>
+                <div className="mt-2 text-sm text-gray-200">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-gray-300">Team 1:</span>
+                    <span className="font-semibold text-white">{getPaceCategory(inputs?.team1?.ppg)}</span>
+                    <span className="text-gray-500">•</span>
+                    <span className="text-gray-300">Team 2:</span>
+                    <span className="font-semibold text-white">{getPaceCategory(inputs?.team2?.ppg)}</span>
+                  </div>
+                  {calcs?.pace && (
+                    <div className="mt-2 text-xs text-gray-300">
+                      Pace adj:{' '}
+                      <span className="text-white font-semibold">T1 {Number(calcs.pace.team1).toFixed(2)}</span>
+                      <span className="text-gray-500"> / </span>
+                      <span className="text-white font-semibold">T2 {Number(calcs.pace.team2).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Efficiency */}
+              <div className="bg-ncaa-gray rounded-lg border border-gray-700 p-4">
+                <div className="text-white font-semibold">Efficiency (base scoring)</div>
+                <div className="mt-2 text-xs text-gray-300">
+                  Base formula: \((team\ PPG + opponent\ pointsAllowed)/2\)
+                </div>
+                {calcs?.base && (
+                  <div className="mt-2 text-sm text-gray-200">
+                    Base:{' '}
+                    <span className="text-white font-semibold">T1 {Number(calcs.base.team1).toFixed(2)}</span>
+                    <span className="text-gray-500"> / </span>
+                    <span className="text-white font-semibold">T2 {Number(calcs.base.team2).toFixed(2)}</span>
+                  </div>
+                )}
+                {inputs?.team1 && inputs?.team2 && (
+                  <div className="mt-2 text-xs text-gray-300">
+                    T1 PPG <span className="text-white font-semibold">{inputs.team1.ppg}</span> vs T2 PA{' '}
+                    <span className="text-white font-semibold">{inputs.team2.pointsAllowed}</span>
+                    <span className="text-gray-500"> • </span>
+                    T2 PPG <span className="text-white font-semibold">{inputs.team2.ppg}</span> vs T1 PA{' '}
+                    <span className="text-white font-semibold">{inputs.team1.pointsAllowed}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Defense / matchup */}
+              <div className="bg-ncaa-gray rounded-lg border border-gray-700 p-4">
+                <div className="text-white font-semibold">Defense / matchup</div>
+                <div className="mt-2 text-sm text-gray-200">
+                  <div className="flex flex-col gap-1">
+                    <div className="text-xs text-gray-300">
+                      Team 1 defense rank:{' '}
+                      <span className="text-white font-semibold">{inputs?.team1?.defenseRank ?? '—'}</span>{' '}
+                      <span className="text-gray-400">({getDefenseTier(inputs?.team1?.defenseRank)})</span>
+                    </div>
+                    <div className="text-xs text-gray-300">
+                      Team 2 defense rank:{' '}
+                      <span className="text-white font-semibold">{inputs?.team2?.defenseRank ?? '—'}</span>{' '}
+                      <span className="text-gray-400">({getDefenseTier(inputs?.team2?.defenseRank)})</span>
+                    </div>
+                  </div>
+                  {calcs?.defense && (
+                    <div className="mt-2 text-xs text-gray-300">
+                      Defense adj:{' '}
+                      <span className="text-white font-semibold">T1 {Number(calcs.defense.team1).toFixed(2)}</span>
+                      <span className="text-gray-500"> / </span>
+                      <span className="text-white font-semibold">T2 {Number(calcs.defense.team2).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Other adjustments */}
+              <div className="bg-ncaa-gray rounded-lg border border-gray-700 p-4">
+                <div className="text-white font-semibold">Other v2.2 adjustments</div>
+                <div className="mt-2 text-xs text-gray-300 space-y-2">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="text-gray-300">
+                      Location:{' '}
+                      <span className="text-white font-semibold">{inputs?.gameContext?.team1Location ?? '—'}</span>
+                    </span>
+                    {calcs?.location && (
+                      <span className="text-gray-300">
+                        Location adj:{' '}
+                        <span className="text-white font-semibold">T1 {Number(calcs.location.team1).toFixed(2)}</span>
+                        <span className="text-gray-500"> / </span>
+                        <span className="text-white font-semibold">T2 {Number(calcs.location.team2).toFixed(2)}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {typeof calcs?.conference === 'number' && (
+                    <div>
+                      Conference adj (total): <span className="text-white font-semibold">{Number(calcs.conference).toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {calcs?.form && (
+                    <div>
+                      Recent form adj:{' '}
+                      <span className="text-white font-semibold">T1 {Number(calcs.form.team1).toFixed(2)}</span>
+                      <span className="text-gray-500"> / </span>
+                      <span className="text-white font-semibold">T2 {Number(calcs.form.team2).toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {calcs?.extremeMismatch && (
+                    <div>
+                      Extreme mismatch adj:{' '}
+                      <span className="text-white font-semibold">T1 {Number(calcs.extremeMismatch.team1).toFixed(2)}</span>
+                      <span className="text-gray-500"> / </span>
+                      <span className="text-white font-semibold">T2 {Number(calcs.extremeMismatch.team2).toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {typeof calcs?.cruiseControl === 'number' && calcs.cruiseControl !== 0 && (
+                    <div>
+                      Cruise control (winner reduction):{' '}
+                      <span className="text-white font-semibold">{Number(calcs.cruiseControl).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Full Game */}
         <div className="bg-ncaa-gray-light rounded-lg p-4">
           <h4 className="text-lg font-semibold text-white mb-3">Full Game Prediction</h4>

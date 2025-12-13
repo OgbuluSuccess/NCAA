@@ -25,6 +25,8 @@ export default async function handler(req, res) {
 
     const prompt = `You are analyzing a screenshot of NCAA basketball team statistics. The image shows statistical tables for TWO teams. Extract data for BOTH teams and return ONLY valid JSON.
 
+This data will be used with the NCAA Basketball Prediction Model v2.2. Do NOT invent new modeling rules. Your job is extraction + validation only.
+
 CRITICAL INSTRUCTIONS:
 1. Look for TWO separate team tables/sections in the image
 2. Each table has columns: Statistic, National Rank, Conference Rank, Value, National Leader, Conference Leader
@@ -52,8 +54,20 @@ IMPORTANT:
 - If the table shows multiple teams, identify which two teams are being compared
 - If only one team table is visible, you may need to look for opponent data elsewhere in the image
 
+MODEL v2.2 CONTEXT (CRITICAL SPECIFICATIONS):
+- Defensive tiers: Elite 1-30, Very Good 31-70, Good 71-110, Average 111-180 (minimal impact), Below Avg 181-250, Poor 251-320, Terrible 321-363
+- Two Good Defenses rule only applies if BOTH teams are 1-70 (NOT 1-100)
+- Location (home/away/neutral) is MANDATORY in v2.2: identify from arena, @ symbol, schedule context if present
+- Pace adjustments are scaled down ~35% (0.65-0.70 of v2.0)
+- Close Game Bonus exists in v2.2 (margin <5 adds +6 to +8 to total) — you do not compute it, just ensure required inputs exist
+- Conference game penalty exists — try to extract conference if visible
+- Bottom 10 extreme mismatch rules exist — ensure NET rank is extracted if visible
+
 Return JSON in this exact format:
 {
+  "validated": true,
+  "warnings": [],
+  "corrections": [],
   "team1": {
     "team": "Exact Team Name from Image",
     "ppg": 84.3,
@@ -99,6 +113,8 @@ Return JSON in this exact format:
 }
 
 DEFAULTS (only use if data truly not visible):
+- team name: If team name cannot be identified, use "Team 1" for team1 and "Team 2" for team2 (NEVER use "Unknown Team")
+- team1Location: MUST be one of "home" | "away" | "neutral". If not visible, set "neutral" and add a warning starting with "ERROR:"
 - defenseRank: Use "Scoring Defense" National Rank if available, else 150
 - fieldGoalPct: Extract from "Field Goal Percentage" Value, convert % to decimal
 - threePointPct: Extract from "Three Point Percentage" Value, convert % to decimal  
@@ -110,7 +126,13 @@ DEFAULTS (only use if data truly not visible):
 - last5PPG: Use ppg if not visible
 - firstHalfPPG: ppg * 0.48 if not visible
 
+VALIDATION NOTES:
+- If any REQUIRED field is missing (PPG, pointsAllowed, defenseRank, FG%, 3PT%, NET rank, overall record, location): add a warning entry starting with "ERROR:"
+- If you convert any percentage (e.g., 47.5 -> 0.475), add an entry to corrections describing what you changed
+
 Return ONLY the JSON object, no markdown, no explanations, no other text.`;
+
+    const openaiModel = process.env.OPENAI_MODEL || 'gpt-5.2';
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -119,7 +141,7 @@ Return ONLY the JSON object, no markdown, no explanations, no other text.`;
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: openaiModel,
         messages: [
           {
             role: 'user',
@@ -137,7 +159,7 @@ Return ONLY the JSON object, no markdown, no explanations, no other text.`;
             ]
           }
         ],
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
         temperature: 0.1
       })
     });

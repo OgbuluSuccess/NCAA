@@ -135,7 +135,7 @@ Uses the enhanced local prediction engine with:
 ## Cost Considerations
 
 - OpenAI API charges per image processed
-- gpt-4o model pricing: Check [OpenAI Pricing](https://openai.com/pricing)
+- Model pricing: Check [OpenAI Pricing](https://openai.com/pricing) (default configured model: `gpt-5.2`, override with `OPENAI_MODEL`)
 - Each prediction uses 1 API call
 - Monitor your usage in OpenAI dashboard
 
