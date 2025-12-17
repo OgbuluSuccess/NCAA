@@ -259,13 +259,13 @@ const FileUploadSection = ({ onTeamsLoaded, onError, onReset, hasTeams }) => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-center space-x-3 mt-6">
+        <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
           {uploadStatus === 'idle' && (
             <>
               <button
                 onClick={handleUploadClick}
                 disabled={uploadStatus === 'uploading'}
-                className="btn-primary flex items-center space-x-2"
+                className="btn-primary flex items-center justify-center space-x-2 w-full sm:w-auto"
               >
                 <Upload className="w-4 h-4" />
                 <span>Choose File</span>
@@ -273,7 +273,7 @@ const FileUploadSection = ({ onTeamsLoaded, onError, onReset, hasTeams }) => {
               <button
                 onClick={handleSelectFolderClick}
                 disabled={uploadStatus === 'uploading'}
-                className="btn-secondary flex items-center space-x-2"
+                className="btn-secondary flex items-center justify-center space-x-2 w-full sm:w-auto"
                 title="Select a folder containing Excel files"
               >
                 <FolderOpen className="w-4 h-4" />
@@ -286,14 +286,14 @@ const FileUploadSection = ({ onTeamsLoaded, onError, onReset, hasTeams }) => {
             <>
               <button
                 onClick={handleUploadClick}
-                className="btn-secondary flex items-center space-x-2"
+                className="btn-secondary flex items-center justify-center space-x-2 w-full sm:w-auto"
               >
                 <Upload className="w-4 h-4" />
                 <span>Upload Different File</span>
               </button>
               <button
                 onClick={handleSelectFolderClick}
-                className="btn-secondary flex items-center space-x-2"
+                className="btn-secondary flex items-center justify-center space-x-2 w-full sm:w-auto"
               >
                 <FolderOpen className="w-4 h-4" />
                 <span>Select Folder</span>
@@ -301,7 +301,7 @@ const FileUploadSection = ({ onTeamsLoaded, onError, onReset, hasTeams }) => {
               {uploadStatus === 'success' && (
                 <button
                   onClick={handleReset}
-                  className="btn-secondary"
+                  className="btn-secondary w-full sm:w-auto"
                 >
                   Reset
                 </button>

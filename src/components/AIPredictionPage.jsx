@@ -770,17 +770,17 @@ const AIPredictionPage = ({ onBack }) => {
 
   return (
     <div className="min-h-screen bg-ncaa-dark">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
         {/* Header */}
-        <header className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <Sparkles className="w-10 h-10 text-ncaa-yellow" />
-            <h1 className="text-4xl md:text-5xl font-bold text-white">
+        <header className="text-center mb-6 sm:mb-8">
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+            <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-ncaa-yellow" />
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
               AI-Powered Prediction
             </h1>
-            <Brain className="w-10 h-10 text-ncaa-blue" />
+            <Brain className="w-8 h-8 sm:w-10 sm:h-10 text-ncaa-blue" />
           </div>
-          <p className="text-xl text-gray-300 font-medium">
+          <p className="text-base sm:text-xl text-gray-300 font-medium">
             Upload Screenshot • AI Analysis • Dual Model Comparison
           </p>
           <p className="text-gray-400 mt-2">
@@ -823,10 +823,10 @@ const AIPredictionPage = ({ onBack }) => {
           </div>
         )}
 
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
           {/* Input Mode Toggle */}
           <div className="card bg-ncaa-gray-light">
-            <div className="flex justify-center space-x-4">
+            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
               <button
                 onClick={() => setInputMode('image')}
                 className={`px-6 py-2 rounded-lg font-semibold transition-all ${
@@ -962,11 +962,11 @@ const AIPredictionPage = ({ onBack }) => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-center space-x-3 flex-wrap">
+              <div className="flex flex-col sm:flex-row justify-center gap-3 flex-wrap">
                 <button
                   onClick={() => processImageWithAI()}
                   disabled={imageFiles.length === 0 || isProcessing}
-                  className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                 >
                   {isProcessing ? (
                     <>
@@ -985,11 +985,11 @@ const AIPredictionPage = ({ onBack }) => {
                   <>
                     <button
                       onClick={handleReset}
-                      className="btn-secondary"
+                      className="btn-secondary w-full sm:w-auto"
                     >
                       Clear All
                     </button>
-                    <div className="text-sm text-gray-400 flex items-center">
+                    <div className="text-sm text-gray-400 flex items-center justify-center">
                       {imageFiles.length} image(s) • Select one to analyze
                     </div>
                   </>
@@ -1062,11 +1062,11 @@ const AIPredictionPage = ({ onBack }) => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex justify-center gap-4">
+                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
                   <button
                     onClick={processManualData}
                     disabled={!manualTeam1Data.trim() || !manualTeam2Data.trim() || isProcessing}
-                    className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                   >
                     {isProcessing ? (
                       <>
@@ -1083,7 +1083,7 @@ const AIPredictionPage = ({ onBack }) => {
                   <button
                     onClick={clearManualInputs}
                     disabled={isProcessing || (!manualTeam1Data.trim() && !manualTeam2Data.trim() && !manualGameContext.trim())}
-                    className="px-6 py-2 bg-ncaa-gray text-gray-300 rounded-lg font-semibold hover:bg-gray-600 transition-all flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2 bg-ncaa-gray text-gray-300 rounded-lg font-semibold hover:bg-gray-600 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                   >
                     <X className="w-4 h-4" />
                     <span>Clear All</span>
@@ -1480,20 +1480,20 @@ const PredictionDisplay = ({ prediction, modelType }) => {
         {/* Full Game */}
         <div className="bg-ncaa-gray-light rounded-lg p-4">
           <h4 className="text-lg font-semibold text-white mb-3">Full Game Prediction</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className={`text-center p-4 rounded-lg ${prediction.team1.isWinner ? 'bg-ncaa-green/30' : 'bg-ncaa-gray'}`}>
-              <div className="text-2xl font-bold text-white">{prediction.team1.name}</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{prediction.team1.name}</div>
               <div className="text-3xl font-bold text-ncaa-yellow mt-2">{prediction.team1.fullGame}</div>
               {(() => {
                 const lean = getScoreLean(1);
                 return (
-                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                  <div className={`mt-3 inline-flex flex-wrap items-center justify-center gap-2 px-3 py-1 rounded-full border text-xs text-center ${lean.color}`}>
                     <span className="font-semibold">Score vs predicted:</span>
                     <span className="font-bold">
                       {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
                     </span>
                     {lean.reasons?.length ? (
-                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                      <span className="text-[11px] text-gray-300 break-words">({lean.reasons.join(', ')})</span>
                     ) : null}
                   </div>
                 );
@@ -1503,18 +1503,18 @@ const PredictionDisplay = ({ prediction, modelType }) => {
               )}
             </div>
             <div className={`text-center p-4 rounded-lg ${prediction.team2.isWinner ? 'bg-ncaa-green/30' : 'bg-ncaa-gray'}`}>
-              <div className="text-2xl font-bold text-white">{prediction.team2.name}</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{prediction.team2.name}</div>
               <div className="text-3xl font-bold text-ncaa-yellow mt-2">{prediction.team2.fullGame}</div>
               {(() => {
                 const lean = getScoreLean(2);
                 return (
-                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                  <div className={`mt-3 inline-flex flex-wrap items-center justify-center gap-2 px-3 py-1 rounded-full border text-xs text-center ${lean.color}`}>
                     <span className="font-semibold">Score vs predicted:</span>
                     <span className="font-bold">
                       {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
                     </span>
                     {lean.reasons?.length ? (
-                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                      <span className="text-[11px] text-gray-300 break-words">({lean.reasons.join(', ')})</span>
                     ) : null}
                   </div>
                 );
@@ -1533,20 +1533,20 @@ const PredictionDisplay = ({ prediction, modelType }) => {
         {/* First Half */}
         <div className="bg-ncaa-gray-light rounded-lg p-4">
           <h4 className="text-lg font-semibold text-white mb-3">First Half Prediction</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="text-center p-4 rounded-lg bg-ncaa-gray">
               <div className="text-xl font-bold text-white">{prediction.team1.name}</div>
               <div className="text-2xl font-bold text-ncaa-blue mt-2">{prediction.team1.firstHalf}</div>
               {(() => {
                 const lean = getScoreLean(1);
                 return (
-                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                  <div className={`mt-3 inline-flex flex-wrap items-center justify-center gap-2 px-3 py-1 rounded-full border text-xs text-center ${lean.color}`}>
                     <span className="font-semibold">1H vs predicted:</span>
                     <span className="font-bold">
                       {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
                     </span>
                     {lean.reasons?.length ? (
-                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                      <span className="text-[11px] text-gray-300 break-words">({lean.reasons.join(', ')})</span>
                     ) : null}
                   </div>
                 );
@@ -1558,13 +1558,13 @@ const PredictionDisplay = ({ prediction, modelType }) => {
               {(() => {
                 const lean = getScoreLean(2);
                 return (
-                  <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${lean.color}`}>
+                  <div className={`mt-3 inline-flex flex-wrap items-center justify-center gap-2 px-3 py-1 rounded-full border text-xs text-center ${lean.color}`}>
                     <span className="font-semibold">1H vs predicted:</span>
                     <span className="font-bold">
                       {lean.direction === 'up' ? '↑' : lean.direction === 'down' ? '↓' : '→'} {lean.label}
                     </span>
                     {lean.reasons?.length ? (
-                      <span className="text-[11px] text-gray-300">({lean.reasons.join(', ')})</span>
+                      <span className="text-[11px] text-gray-300 break-words">({lean.reasons.join(', ')})</span>
                     ) : null}
                   </div>
                 );
